@@ -25,7 +25,7 @@ class ImagePlotter:
 
         # Initialize plotting areas
         self.ax1 = self.fig.add_subplot(gs[0, 0])
-        self.ax2 = self.fig.add_subplot(gs[1, 0])
+        self.ax2 = self.fig.add_subplot(gs[1, 0], sharex=self.ax1)
         self.ax3 = self.fig.add_subplot(gs[0, 1])
         self.ax4 = self.fig.add_subplot(gs[1, 1])
         self.ax5 = self.fig.add_subplot(gs[2, :])
