@@ -151,6 +151,7 @@ class ImagePlotter:
         
         self.ax2.set_xlabel('X')
         self.ax2.set_ylabel('Z')
+        self.ax2.set_aspect(self.z_scale)
 
     def show(self):
         self.init_plot()
