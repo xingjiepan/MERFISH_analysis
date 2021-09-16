@@ -16,9 +16,9 @@ class ImagePlotter:
         self.y = 0
         self.z_scale = z_scale
         
-    def init_plot(self):
+    def init_plot(self, figsize=None):
         stack_size = self.get_image_stack_size()
-        self.fig = plt.figure(constrained_layout=True)
+        self.fig = plt.figure(figsize=figsize, constrained_layout=True)
         widths = [1, 0.05]
         heights = [1, 1, 0.2]
         gs = self.fig.add_gridspec(nrows=3, ncols=2, width_ratios=widths, height_ratios=heights) 
@@ -58,9 +58,12 @@ class ImagePlotter:
         self.plot_x_y_plane(preserve_image_size=True)
         self.plot_x_z_plane(preserve_image_size=True)
 
-    def add_image_stack(self, channel_name, image_stack, color_rgb):
-        color_rgb = np.array(color_rgb) / max(color_rgb) # Normalize the color
-        self.channels[channel_name] = [image_stack, color_rgb, True] 
+    def add_image_stack(self, channel_name, image_stack, color):
+        # Normalize the RGB color
+        if not (type(color) is str or color is None):
+            color = np.array(color) / max(color) 
+        
+        self.channels[channel_name] = [image_stack, color, True] 
 
     def get_image_stack_size(self):
         '''Get the size of the image stack.
@@ -91,6 +94,21 @@ class ImagePlotter:
             n_active += self.channels[channel_name][2]
         return n_active
 
+    def get_colors_for_clip(self, clip, color):
+        # Use the defined channel color
+        if type(color) is np.ndarray: 
+            return clip[:, :, np.newaxis] * color[np.newaxis, np.newaxis, :]
+       
+        # Use the chaotic color generator
+        if color == 'chaotic':
+            def chaotic_func(x, shift):
+                return np.sin(100 / (x + 1e-20 + shift * 0.01)) * (x > 0)
+
+            return np.stack((chaotic_func(clip, 0), chaotic_func(clip, 1), chaotic_func(clip, 2)), axis=-1)
+
+        # Default color
+        return np.stack((clip, clip, clip), axis=-1)
+
     def plot_x_y_plane(self, preserve_image_size=False):
         # Get the current image size
         if preserve_image_size:
@@ -103,13 +121,13 @@ class ImagePlotter:
         img = np.zeros((stack_size[2], stack_size[1], 3))
         
         for channel_name in self.channels:
-            image_stack, color_rgb, visible = self.channels[channel_name]
+            image_stack, color, visible = self.channels[channel_name]
             
             if visible:
                 v_max = np.max(image_stack)
                 v_min = np.min(image_stack)
                 clip = np.transpose(image_stack[self.z] - v_min) / (v_max - v_min + 1e-20)
-                img += clip[:, :, np.newaxis] * color_rgb[np.newaxis, np.newaxis, :]
+                img += self.get_colors_for_clip(clip, color)
         
         self.ax1.imshow(img / (self.n_active_channels() + 1e-20))
 
@@ -134,13 +152,13 @@ class ImagePlotter:
         img = np.zeros((stack_size[0], stack_size[1], 3))
         
         for channel_name in self.channels:
-            image_stack, color_rgb, visible = self.channels[channel_name]
+            image_stack, color, visible = self.channels[channel_name]
             
             if visible:
                 v_max = np.max(image_stack)
                 v_min = np.min(image_stack)
                 clip = (image_stack[:, :, self.y] - v_min) / (v_max - v_min + 1e-20)
-                img += clip[:, :, np.newaxis] * color_rgb[np.newaxis, np.newaxis, :]
+                img += self.get_colors_for_clip(clip, color)
         
         self.ax2.imshow(img / (self.n_active_channels() + 1e-20))
 
@@ -153,8 +171,8 @@ class ImagePlotter:
         self.ax2.set_ylabel('Z')
         self.ax2.set_aspect(self.z_scale)
 
-    def show(self):
-        self.init_plot()
+    def show(self, figsize=None):
+        self.init_plot(figsize=figsize)
         self.plot_x_y_plane()
         self.plot_x_z_plane()
 
