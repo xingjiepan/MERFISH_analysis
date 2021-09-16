@@ -102,7 +102,7 @@ class ImagePlotter:
         # Use the chaotic color generator
         if color == 'chaotic':
             def chaotic_func(x, shift):
-                return np.sin(100 / (x + 1e-20 + shift * 0.01)) * (x > 0)
+                return (np.sin(100 / (x + 1e-20 + shift * 0.01)) * 0.49 + 0.5 ) * (x > 0)
 
             return np.stack((chaotic_func(clip, 0), chaotic_func(clip, 1), chaotic_func(clip, 2)), axis=-1)
 
