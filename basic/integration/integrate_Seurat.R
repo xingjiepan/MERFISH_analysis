@@ -109,6 +109,6 @@ FeaturePlot(integrated_query, reduction='umap', features = c('nCount_RNA'), cols
 dev.off()
 
 # Plot the distributions of query data features
-png(filename=paste(output_path, 'query_cell_molecule_counts.png', sep='/'), width=1024, height=1024)
+png(filename=paste(output_path, 'query_cell_features.png', sep='/'), width=1024, height=1024)
 VlnPlot(integrated_query, c('nFeature_RNA', 'predicted_cell_type_proba'))
 dev.off()
