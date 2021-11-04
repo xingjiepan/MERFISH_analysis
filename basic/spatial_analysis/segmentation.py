@@ -39,6 +39,7 @@ def extract_cell_boundaries_from_one_file(hdf5_feature_file):
 def extact_cell_boundaries_from_multiple_files(hdf5_feature_files):
     dict_cell_boundaries = {}
     for hdf5_feature_file in hdf5_feature_files:
+        print(f'Extract cell boundaries from file {hdf5_feature_file}')
         dict_cell_boundaries_one_file = extract_cell_boundaries_from_one_file(hdf5_feature_file)
         
         dict_cell_boundaries = {**dict_cell_boundaries, **dict_cell_boundaries_one_file}
