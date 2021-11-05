@@ -23,10 +23,18 @@ def balanced_divide(df_cell_types, cluster_column, N_subsets, min_N_cells_per_cl
         A list of list of cell IDs for each subset.
     '''
     cell_ids = [[] for i in range(N_subsets)]
-    cell_types = np.unique(df_cell_types[cluster_column])
+    list_cluster_ids = []
+    
+    if cluster_column in df_cell_types.columns:
+        cell_types = np.unique(df_cell_types[cluster_column])
+        for ct in cell_types:
+            cluster_ids = list(df_cell_types.index[df_cell_types[cluster_column] == ct])
+            list_cluster_ids.append(cluster_ids)
+    else:
+        print(f'WARNING: The specified cluster column {cluster_column} does not exist. Continue with a single cluster.')
+        list_cluster_ids.append(list(df_cell_types.index))
 
-    for ct in cell_types:
-        cluster_ids = list(df_cell_types.index[df_cell_types[cluster_column] == ct])
+    for cluster_ids in list_cluster_ids:
         np.random.shuffle(cluster_ids)
         
         step_size = int(len(cluster_ids) / N_subsets)

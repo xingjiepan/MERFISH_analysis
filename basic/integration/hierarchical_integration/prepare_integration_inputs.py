@@ -12,7 +12,7 @@ if __name__ == '__main__':
     reference_adata_file = 'test/scRNAseq_downsample_0.gzip.h5ad'
     query_adata_file = 'test/merfish_downsample_0.gzip.h5ad'
     reference_cell_type_column = 'seurat_clusters'
-    query_cell_type_column = 'de_novo_cluster'
+    query_cell_type_column = None #'de_novo_cluster'
     approximate_subset_size = 1000
     n_repeat_query = 2
     min_N_cells_per_cluster = 10
