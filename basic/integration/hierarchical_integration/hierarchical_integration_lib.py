@@ -37,7 +37,7 @@ def balanced_divide(df_cell_types, cluster_column, N_subsets, min_N_cells_per_cl
     for cluster_ids in list_cluster_ids:
         np.random.shuffle(cluster_ids)
         
-        step_size = int(len(cluster_ids) / N_subsets)
+        step_size = int(np.ceil(len(cluster_ids) / N_subsets))
         N_cells_each_selection = max(min_N_cells_per_cluster, step_size)
         
         for i in range(N_subsets):
