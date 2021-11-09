@@ -132,8 +132,7 @@ def prepare_integration_inputs(output_path, reference_adata_file, query_adata_fi
             query_cell_type_column, min_N_cells_per_cluster, subsets_path, conversion_script, 'query',
             n_threads=n_threads)
     
-def generate_seurat_integration_script(output_file, label_transfer=True, impute_gene_expression=True,
-        plot_coembedding=True):
+def generate_seurat_integration_script(output_file, impute_gene_expression=True, plot_coembedding=True):
     '''Generate an R script for integration using Seurat.'''
     script = '''# R script for integrating a query Seurat dataset to a reference Seurat dataset.
 # Usage:
@@ -179,18 +178,14 @@ d_list <- lapply(X = d_list, FUN = function(x) {
 # Select features that are repeatedly variable across datasets for integration
 features <- SelectIntegrationFeatures(object.list = d_list)
 features = features[features != drop_gene]
-'''
-    if label_transfer or impute_gene_expression:
-        script += '''
+
 ## IMPUTATION AND LABEL TRANSFER
 # Find the anchors for imputation and label transfer
 anchors_t <- FindTransferAnchors(reference = dR, query = dQ, reduction='cca', features=features)
-'''
-    if label_transfer:
-        script += '''
+
 # Predict the class labels and same the predictions as a csv file 
 predictions_class_label <- TransferData(anchorset = anchors_t, weight.reduction = 'cca', refdata=dR@meta.data[[cell_type_col]])
-write.csv(as.data.frame(predictions_class_label), paste(output_path, 'predicted_cell_types.csv'))
+write.csv(as.data.frame(predictions_class_label), paste(output_path, 'predicted_cell_types.csv', sep='/'))
 '''
     if impute_gene_expression:
         script += '''
@@ -199,13 +194,13 @@ predictions_counts <- TransferData(anchorset = anchors_t, weight.reduction = 'cc
 imputed_Q <- CreateSeuratObject(counts = predictions_counts)
 
 # Predict the cell types in the query dataset
-predictions_class_label <- TransferData(anchorset = anchors_t, weight.reduction = 'cca', refdata=dR@meta.data[[cell_type_col]])
 imputed_Q <- AddMetaData(imputed_Q, predictions_class_label['predicted.id'], col.name = 'predicted.id')
 imputed_Q <- AddMetaData(imputed_Q, predictions_class_label['prediction.score.max'], col.name = 'prediction.score.max')
 
 # Save the imputed dataset
 SaveH5Seurat(imputed_Q, filename = paste(output_path, 'imputation.h5Seurat', sep='/'), overwrite = TRUE)
 Convert(paste(output_path, 'imputation.h5Seurat', sep='/'), dest = "h5ad", overwrite = TRUE)
+file.remove(paste(output_path, 'imputation.h5Seurat', sep='/'))
 '''
     if plot_coembedding:
         script += '''
@@ -223,8 +218,8 @@ d_integrated <- RunUMAP(d_integrated, dims = 1:50)
 
 # Make splitted copies of the integrated data
 splitted_d_integrated <- SplitObject(d_integrated, split.by='source')
-integrated_query <- AddMetaData(splitted_d_integrated[["query"]], predictions_class_label['prediction.score.max'], col.name = 'predicted_cell_type_proba')
-integrated_query <- AddMetaData(integrated_query, predictions_class_label[1], col.name = 'predicted_cell_type')
+integrated_query <- AddMetaData(splitted_d_integrated[["query"]], predictions_class_label['prediction.score.max'], col.name = 'prediction.score.max')
+integrated_query <- AddMetaData(integrated_query, predictions_class_label['predicted.id'], col.name = 'predicted.id')
 integrated_ref <- splitted_d_integrated[["reference"]]
 
 # Plot the co-embedding
@@ -239,12 +234,12 @@ dev.off()
 
 # Plot the imputed cell types
 png(filename=paste(output_path, 'imputed_cell_types.png', sep='/'), width=1024, height=1024)
-DimPlot(integrated_query, reduction = "umap", group.by = 'predicted_cell_type', label=TRUE)
+DimPlot(integrated_query, reduction = "umap", group.by = 'predicted.id', label=TRUE)
 dev.off()
 
 # Plot the imputed cell type probabilities
 png(filename=paste(output_path, 'imputed_cell_type_proba.png', sep='/'), width=1024, height=1024)
-FeaturePlot(integrated_query, reduction='umap', features = c('predicted_cell_type_proba'), cols=c('lightgrey', 'blue'), min.cutoff='q5', max.cutoff='q95')
+FeaturePlot(integrated_query, reduction='umap', features = c('prediction.score.max'), cols=c('lightgrey', 'blue'), min.cutoff='q5', max.cutoff='q95')
 dev.off()
 
 # Plot the number of detected genes in each query cell
@@ -259,7 +254,7 @@ dev.off()
 
 # Plot the distributions of query data features
 png(filename=paste(output_path, 'query_cell_features.png', sep='/'), width=1024, height=1024)
-VlnPlot(integrated_query, c('nFeature_RNA', 'predicted_cell_type_proba'))
+VlnPlot(integrated_query, c('nFeature_RNA', 'prediction.score.max'))
 dev.off()'''
 
     with open(output_file, 'w') as f:
