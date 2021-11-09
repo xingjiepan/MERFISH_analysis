@@ -78,7 +78,7 @@ def generate_one_subset(i, adata, subset_cell_ids, subsets_path, data_file_prefi
     adata_ds = adata[adata.obs.index.isin(subset_cell_ids[i])]
     os.makedirs(os.path.join(subsets_path, str(i), 'integrated'), exist_ok=True)
     
-    output_file = os.path.join(subsets_path, str(i), f'{data_file_prefix}_{i}.gzip.h5ad')
+    output_file = os.path.join(subsets_path, str(i), f'{data_file_prefix}.gzip.h5ad')
     adata_ds.write(output_file, compression='gzip')
     convert_h5ad_to_h5seurat(conversion_script, output_file)
     os.remove(output_file)
