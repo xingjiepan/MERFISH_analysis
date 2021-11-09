@@ -4,6 +4,7 @@
 
 import os
 import subprocess
+from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
@@ -72,9 +73,20 @@ def convert_h5ad_to_h5seurat(conversion_script, input_file):
     conversion_cmd = ['Rscript', '--vanilla', conversion_script, input_file]
     subprocess.check_call(conversion_cmd)
 
+def generate_one_subset(i, adata, subset_cell_ids, subsets_path, data_file_prefix, conversion_script):
+    print(f'Generating the subset {data_file_prefix}_{i}.')
+    adata_ds = adata[adata.obs.index.isin(subset_cell_ids[i])]
+    os.makedirs(os.path.join(subsets_path, str(i)), exist_ok=True)
+    
+    output_file = os.path.join(subsets_path, str(i), f'{data_file_prefix}_{i}.gzip.h5ad')
+    adata_ds.write(output_file, compression='gzip')
+    convert_h5ad_to_h5seurat(conversion_script, output_file)
+    os.remove(output_file)
+
 def generate_subsets(adata, N_subsets, n_repeat, N_subsets_to_write, 
         cell_type_column, min_N_cells_per_cluster,
-        subsets_path, conversion_script, data_file_prefix):
+        subsets_path, conversion_script, data_file_prefix,
+        n_threads=1):
     '''Generate the subsets of a dataset.'''
     
     print(f'Determining the cell IDs for {data_file_prefix} subsets.')
@@ -82,19 +94,14 @@ def generate_subsets(adata, N_subsets, n_repeat, N_subsets_to_write,
     for i in range(n_repeat):
         subset_cell_ids += balanced_divide(adata.obs, cell_type_column, N_subsets, min_N_cells_per_cluster)
 
-    for i in range(N_subsets_to_write):
-        print(f'Generating the subset {data_file_prefix}_{i}.')
-        adata_ds = adata[adata.obs.index.isin(subset_cell_ids[i])]
-        os.makedirs(os.path.join(subsets_path, str(i)), exist_ok=True)
-        
-        output_file = os.path.join(subsets_path, str(i), f'{data_file_prefix}_{i}.gzip.h5ad')
-        adata_ds.write(output_file, compression='gzip')
-        convert_h5ad_to_h5seurat(conversion_script, output_file)
-        os.remove(output_file)
+    # Generate the subsets in prallel
+    with Pool(n_threads) as p:
+        p.starmap(generate_one_subset, [(i, adata, subset_cell_ids, subsets_path, data_file_prefix, conversion_script) 
+            for i in range(N_subsets_to_write)])
 
 def prepare_integration_inputs(output_path, reference_adata_file, query_adata_file, 
         reference_cell_type_column, query_cell_type_column, approximate_subset_size=10000,
-        n_repeat_query=3, min_N_cells_per_cluster=50):
+        n_repeat_query=3, min_N_cells_per_cluster=50, n_threads=1):
     '''Prepare the inputs for the actual integration script.
     NOTE: the adata files should already be cleaned to remove all
     unnecessary metadata.
@@ -118,10 +125,12 @@ def prepare_integration_inputs(output_path, reference_adata_file, query_adata_fi
     generate_h5ad_to_h5seurat_conversion_R_script(conversion_script)
 
     generate_subsets(reference_adata, N_subsets_reference, n_repeat_reference, N_subsets_to_write,
-            reference_cell_type_column, min_N_cells_per_cluster, subsets_path, conversion_script, 'reference')
+            reference_cell_type_column, min_N_cells_per_cluster, subsets_path, conversion_script, 'reference',
+            n_threads=n_threads)
 
     generate_subsets(query_adata, N_subsets_query, n_repeat_query, N_subsets_to_write,
-            query_cell_type_column, min_N_cells_per_cluster, subsets_path, conversion_script, 'query')
+            query_cell_type_column, min_N_cells_per_cluster, subsets_path, conversion_script, 'query',
+            n_threads=n_threads)
     
     
 

@@ -16,7 +16,8 @@ if __name__ == '__main__':
     approximate_subset_size = 1000
     n_repeat_query = 2
     min_N_cells_per_cluster = 10
+    n_threads = 8
 
     prepare_integration_inputs(output_path, reference_adata_file, query_adata_file, 
         reference_cell_type_column, query_cell_type_column, approximate_subset_size,
-        n_repeat_query, min_N_cells_per_cluster)
+        n_repeat_query, min_N_cells_per_cluster, n_threads=n_threads)
