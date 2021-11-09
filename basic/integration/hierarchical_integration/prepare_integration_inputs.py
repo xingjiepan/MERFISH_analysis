@@ -2,7 +2,7 @@
 '''Generate the input files for hierarchical integration.
 '''
 
-from hierarchical_integration_lib import prepare_integration_inputs
+from lib_prepare_integration_inputs import prepare_integration_inputs
 
 
 
