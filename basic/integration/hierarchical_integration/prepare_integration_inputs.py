@@ -19,10 +19,10 @@ if __name__ == '__main__':
     min_N_cells_per_cluster = 10
     n_threads = 8
 
-    #prepare_integration_inputs(output_path, reference_adata_file, query_adata_file, 
-    #    reference_cell_type_column, query_cell_type_column, approximate_subset_size,
-    #    n_repeat_query, min_N_cells_per_cluster, n_threads=n_threads)
+    prepare_integration_inputs(output_path, reference_adata_file, query_adata_file, 
+        reference_cell_type_column, query_cell_type_column, approximate_subset_size,
+        n_repeat_query, min_N_cells_per_cluster, n_threads=n_threads)
 
 
-    generate_seurat_integration_script(os.path.join(output_path, 'integrate.R'), label_transfer=True, 
+    generate_seurat_integration_script(os.path.join(output_path, 'integrate.R'), 
             impute_gene_expression=True, plot_coembedding=True)
