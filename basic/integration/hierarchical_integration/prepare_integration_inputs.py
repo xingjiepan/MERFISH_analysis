@@ -318,22 +318,3 @@ if __name__ == '__main__':
         reference_col_cell_type, None, approximate_subset_size=approximate_subset_size,
         n_repeat_query=n_repeat_query, min_N_cells_per_cluster=min_N_cells_per_cluster, n_threads=n_threads)
 
-#    prepare_integration_inputs(output_path, reference_adata_file, query_adata_file, 
-#        reference_cell_type_column, query_cell_type_column, approximate_subset_size,
-#        n_repeat_query, min_N_cells_per_cluster, n_threads=n_threads)
-
-#    #    output_path = 'test/output'
-#    reference_adata_file = 'test/scRNAseq_downsample_0.gzip.h5ad'
-#    query_adata_file = 'test/merfish_downsample_0.gzip.h5ad'
-#    reference_cell_type_column = 'seurat_clusters'
-#    query_cell_type_column = None #'de_novo_cluster'
-#    approximate_subset_size = 1000
-#    n_repeat_query = 2
-#    min_N_cells_per_cluster = 10
-#    n_threads = 8
-#
-#    prepare_integration_inputs(output_path, reference_adata_file, query_adata_file, 
-#        reference_cell_type_column, query_cell_type_column, approximate_subset_size,
-#        n_repeat_query, min_N_cells_per_cluster, n_threads=n_threads)
-#
-#
