@@ -3,7 +3,6 @@
 import os
 
 import numpy as np
-import scanpy as sc
 import anndata
 
 
@@ -11,7 +10,7 @@ import anndata
 def load_and_clean_adata(adata_file, obs_columns_to_keep):
     '''Clean an adata file by removing all metadata except for specified
     columns.'''
-    adata = sc.read_h5ad(adata_file)
+    adata = anndata.read_h5ad(adata_file)
     adata_cleaned = anndata.AnnData(X=adata.X, obs=adata.obs[obs_columns_to_keep], var=adata.var[[]])
     return adata_cleaned
 

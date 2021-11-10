@@ -9,7 +9,6 @@ from optparse import OptionParser
 import numpy as np
 import pandas as pd
 import anndata
-import scanpy as sc
 
 
 def balanced_divide(df_cell_types, cluster_column, N_subsets, min_N_cells_per_cluster):
@@ -134,8 +133,8 @@ def prepare_integration_inputs_for_one_round(output_path, reference_adata_file, 
         n_repeat_query=3, min_N_cells_per_cluster=50, n_threads=1):
     '''Prepare inputs for one round of integration.'''
     # Load the data
-    reference_adata = sc.read_h5ad(reference_adata_file)
-    query_adata = sc.read_h5ad(query_adata_file)
+    reference_adata = anndata.read_h5ad(reference_adata_file)
+    query_adata = anndata.read_h5ad(query_adata_file)
 
     # Get the cell types by which the dataset is splitted into smaller sets
     cell_types_to_split = np.unique(reference_adata.obs[reference_col_to_split])
