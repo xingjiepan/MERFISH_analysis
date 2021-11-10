@@ -4,6 +4,7 @@
 import os
 import subprocess
 from multiprocessing import Pool
+from optparse import OptionParser
 
 import numpy as np
 import pandas as pd
@@ -98,17 +99,13 @@ def generate_subsets(adata, N_subsets, n_repeat, N_subsets_to_write,
         p.starmap(generate_one_subset, [(i, adata, subset_cell_ids, subsets_path, data_file_prefix, conversion_script) 
             for i in range(N_subsets_to_write)])
 
-def prepare_integration_inputs(output_path, reference_adata_file, query_adata_file, 
+def prepare_integration_inputs_for_one_cell_type(output_path, reference_adata, query_adata, 
         reference_cell_type_column, query_cell_type_column, approximate_subset_size=10000,
         n_repeat_query=3, min_N_cells_per_cluster=50, n_threads=1):
     '''Prepare the inputs for the actual integration script.
     NOTE: the adata files should already be cleaned to remove all
     unnecessary metadata.
     '''
-    # Load the data
-    reference_adata = sc.read_h5ad(reference_adata_file)
-    query_adata = sc.read_h5ad(query_adata_file)
-
     # Determine the number of subsets to generate
     N_subsets_reference = max(1, int(reference_adata.shape[0] / approximate_subset_size))
     N_subsets_query = max(1, int(query_adata.shape[0] / approximate_subset_size))
@@ -130,7 +127,32 @@ def prepare_integration_inputs(output_path, reference_adata_file, query_adata_fi
     generate_subsets(query_adata, N_subsets_query, n_repeat_query, N_subsets_to_write,
             query_cell_type_column, min_N_cells_per_cluster, subsets_path, conversion_script, 'query',
             n_threads=n_threads)
-    
+   
+def prepare_integration_inputs_for_one_round(output_path, reference_adata_file, query_adata_file, 
+        reference_col_to_split, query_col_to_split, 
+        reference_cell_type_column, query_cell_type_column, approximate_subset_size=10000,
+        n_repeat_query=3, min_N_cells_per_cluster=50, n_threads=1):
+    '''Prepare inputs for one round of integration.'''
+    # Load the data
+    reference_adata = sc.read_h5ad(reference_adata_file)
+    query_adata = sc.read_h5ad(query_adata_file)
+
+    # Get the cell types by which the dataset is splitted into smaller sets
+    cell_types_to_split = np.unique(reference_adata.obs[reference_col_to_split])
+
+    # Generate inputs for each splitted cell type
+    for ct in cell_types_to_split: 
+        print(f'Generating integration inputs for {reference_col_to_split}:{ct}.')
+        
+        output_path_ct = os.path.join(output_path, ct)
+        reference_adata_ct = reference_adata[reference_adata.obs[reference_col_to_split] == ct]
+        query_adata_ct = query_adata[query_adata.obs[reference_col_to_split] == ct]
+        #TODO: deal with the case when there is no cell in the query
+
+        prepare_integration_inputs_for_one_cell_type(output_path_ct, reference_adata_ct, query_adata_ct,
+                reference_cell_type_column, query_cell_type_column, approximate_subset_size=approximate_subset_size,
+                n_repeat_query=n_repeat_query, min_N_cells_per_cluster=min_N_cells_per_cluster, n_threads=n_threads)
+
 def generate_seurat_integration_script(output_file, impute_gene_expression=True, plot_coembedding=True):
     '''Generate an R script for integration using Seurat.'''
     script = '''# R script for integrating a query Seurat dataset to a reference Seurat dataset.
@@ -261,21 +283,57 @@ dev.off()'''
 
 
 if __name__ == '__main__':
+    parser = OptionParser()
+    parser.add_option('-r', '--n_repeat_query', dest='n_repeat_query', action='store', type='int', default=3,
+            help='Number of repeats for each query cell.')
+    parser.add_option('-m', '--min_N_cells_per_cluster', dest='min_N_cells_per_cluster', action='store', 
+            type='int', default=30, help='Minimal number of cells that should exist in each reference cluster.')
+    parser.add_option('-n', '--n_threads', dest='n_threads', action='store', type='int', default=1,
+            help='The gene to drop during integration.')
+    parser.add_option('-i', '--impute', dest='impute', action='store_true',
+            help='Impute gene expression.')
+
+    (options, args) = parser.parse_args()
     
-    output_path = 'test/output'
-    reference_adata_file = 'test/scRNAseq_downsample_0.gzip.h5ad'
-    query_adata_file = 'test/merfish_downsample_0.gzip.h5ad'
-    reference_cell_type_column = 'seurat_clusters'
-    query_cell_type_column = None #'de_novo_cluster'
-    approximate_subset_size = 1000
-    n_repeat_query = 2
-    min_N_cells_per_cluster = 10
-    n_threads = 8
+    output_path = args[0] 
+    reference_adata_file = args[1] 
+    query_adata_file = args[2]
+    reference_col_to_split = args[3]
+    query_col_to_split = args[4]
+    reference_col_cell_type = args[5]
+    approximate_subset_size = int(args[6])
 
-    prepare_integration_inputs(output_path, reference_adata_file, query_adata_file, 
-        reference_cell_type_column, query_cell_type_column, approximate_subset_size,
-        n_repeat_query, min_N_cells_per_cluster, n_threads=n_threads)
+    n_repeat_query = options.n_repeat_query
+    min_N_cells_per_cluster = options.min_N_cells_per_cluster
+    n_threads = options.n_threads
+    impute_gene_expression = options.impute
 
-
+    # Generate the integration script
     generate_seurat_integration_script(os.path.join(output_path, 'integrate.R'), 
-            impute_gene_expression=True, plot_coembedding=True)
+            impute_gene_expression=impute_gene_expression, plot_coembedding=True)
+
+    # Generate the input data
+    prepare_integration_inputs_for_one_round(output_path, reference_adata_file, query_adata_file, 
+        reference_col_to_split, query_col_to_split, 
+        reference_col_cell_type, None, approximate_subset_size=approximate_subset_size,
+        n_repeat_query=n_repeat_query, min_N_cells_per_cluster=min_N_cells_per_cluster, n_threads=n_threads)
+
+#    prepare_integration_inputs(output_path, reference_adata_file, query_adata_file, 
+#        reference_cell_type_column, query_cell_type_column, approximate_subset_size,
+#        n_repeat_query, min_N_cells_per_cluster, n_threads=n_threads)
+
+#    #    output_path = 'test/output'
+#    reference_adata_file = 'test/scRNAseq_downsample_0.gzip.h5ad'
+#    query_adata_file = 'test/merfish_downsample_0.gzip.h5ad'
+#    reference_cell_type_column = 'seurat_clusters'
+#    query_cell_type_column = None #'de_novo_cluster'
+#    approximate_subset_size = 1000
+#    n_repeat_query = 2
+#    min_N_cells_per_cluster = 10
+#    n_threads = 8
+#
+#    prepare_integration_inputs(output_path, reference_adata_file, query_adata_file, 
+#        reference_cell_type_column, query_cell_type_column, approximate_subset_size,
+#        n_repeat_query, min_N_cells_per_cluster, n_threads=n_threads)
+#
+#
