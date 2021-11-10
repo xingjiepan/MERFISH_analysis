@@ -43,13 +43,32 @@ def generate_script_for_prepare_inputs(script_home, project_path, rd,
     with open(os.path.join(project_path, f'round{rd}_prepare_inputs.sh'), 'w') as f:
         f.write(script)
 
-
-def generate_script_for_integrate_subsets(project_path, rd, cell_types, reference_col_cell_type, 
-        drop_gene=None, overwrite=False):
+def generate_script_for_integrate_subsets(script_home, project_path, rd, reference_col_cell_type, 
+        drop_gene=None, overwrite=False, n_threads=1, slurm=False):
     '''Generate script for integrating subsets of a round.'''
-    pass
+    task_script = os.path.abspath(os.path.join(script_home, 'integrate_subsets.py'))
+    round_path = os.path.abspath(os.path.join(project_path, f'round{rd}'))
 
-def generate_script_for_analyze_result(project_path, rd, query_adata_file, new_query_adata_file,
+    cmd = [task_script, '-n', str(n_threads)]
+    
+    if not (drop_gene is None):
+        cmd += ['-d', drop_gene]
+    if overwrite:
+        cmd.append('-o')
+    if slurm:
+        cmd.append('-s')
+
+    cmd += [round_path, reference_col_cell_type]
+
+    script = f'''#!/bin/bash
+    
+{' '.join(cmd)}
+    '''
+
+    with open(os.path.join(project_path, f'round{rd}_integrate_subsets.sh'), 'w') as f:
+        f.write(script)
+
+def generate_script_for_analyze_result(script_home, project_path, rd, query_adata_file, new_query_adata_file,
         prediction_col, prediction_proba_col):
     '''Generate script for analyzing result of a round.'''
     pass
@@ -83,7 +102,7 @@ def initialize_integration_project(script_home, project_path, reference_adata_fi
 
         # Generate input preparation scripts
         if i == 0:
-            query_adata_file = cleaned_reference_adata_file
+            query_adata_file = cleaned_query_adata_file
             reference_col_to_split = 'root_type'
             query_col_to_split = 'root_type'
        
@@ -97,7 +116,7 @@ def initialize_integration_project(script_home, project_path, reference_adata_fi
         approximate_subset_size = 1000 #TODO
         n_repeat_query=3 #TODO
         min_N_cells_per_cluster=30 #TODO
-        n_threads=1 #TODO
+        n_threads=16 #TODO
         impute_gene_expression=False #TODO
 
         generate_script_for_prepare_inputs(script_home, project_path, i, 
@@ -106,6 +125,15 @@ def initialize_integration_project(script_home, project_path, reference_adata_fi
             approximate_subset_size, n_repeat_query, min_N_cells_per_cluster, n_threads,
             impute_gene_expression)
 
+        # Generate actual integration script
+        
+        drop_gene=None #TODO
+        overwrite=False #TODO
+        n_threads=16 #TODO
+        slurm=False #TODO
+        generate_script_for_integrate_subsets(script_home, project_path, i, reference_col_cell_type, 
+                drop_gene=drop_gene, overwrite=overwrite, n_threads=n_threads, slurm=slurm)
+        
 
 
 if __name__ == '__main__':

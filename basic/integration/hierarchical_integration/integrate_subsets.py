@@ -41,15 +41,22 @@ def integrate_all_subsets_local(integration_path, cell_type_col, drop_gene=None,
     '''Run integration for all subsets on a local computer.'''
     integration_script = os.path.join(integration_path, 'integrate.R')
 
-    integration_args = [(os.path.join(integration_path, 'subsets', p), 
+    # Find all subsets for integration
+    integration_args = []
+    for f in os.listdir(integration_path):
+        subsets_path = os.path.join(integration_path, f, 'subsets')
+
+        if os.path.exists(subsets_path):
+            integration_args += [(os.path.join(subsets_path, p), 
             integration_script, cell_type_col, drop_gene, overwrite) 
-            for p in os.listdir(os.path.join(integration_path, 'subsets'))]
+            for p in os.listdir(subsets_path)]
     
     with Pool(n_threads) as p:
         p.starmap(integrate_one_subset, integration_args) 
  
 def integrate_all_subsets_slurm():
     #TODO:implement
+    pass
 
 if __name__ == '__main__':
     parser = OptionParser()
@@ -59,9 +66,12 @@ if __name__ == '__main__':
             help='Overwrite the existing result.')
     parser.add_option('-n', '--n_threads', dest='n_threads', action='store', type='int', default=1,
             help='The gene to drop during integration.')
+    parser.add_option('-s', '--slurm', dest='slurm', action='store_true',
+            help='Run the job on a slurm cluster. The default behavior is running locally.')
 
     (options, args) = parser.parse_args()
     integration_path, cell_type_col = args
 
-    integrate_all_subsets_local(integration_path, cell_type_col, drop_gene=options.drop_gene,
-            overwrite=options.overwrite, n_threads=options.n_threads)
+    if not options.slurm:
+        integrate_all_subsets_local(integration_path, cell_type_col, drop_gene=options.drop_gene,
+                overwrite=options.overwrite, n_threads=options.n_threads)

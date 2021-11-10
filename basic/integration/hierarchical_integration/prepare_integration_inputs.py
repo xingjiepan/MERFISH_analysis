@@ -146,7 +146,7 @@ def prepare_integration_inputs_for_one_round(output_path, reference_adata_file, 
         
         output_path_ct = os.path.join(output_path, ct)
         reference_adata_ct = reference_adata[reference_adata.obs[reference_col_to_split] == ct]
-        query_adata_ct = query_adata[query_adata.obs[reference_col_to_split] == ct]
+        query_adata_ct = query_adata[query_adata.obs[query_col_to_split] == ct]
         #TODO: deal with the case when there is no cell in the query
 
         prepare_integration_inputs_for_one_cell_type(output_path_ct, reference_adata_ct, query_adata_ct,
