@@ -153,7 +153,7 @@ def initialize_integration_project(script_home, project_path, reference_adata_fi
         else:
             adata_file_before_integration = os.path.join(project_path, f'round{i-1}', 'integrated.h5ad')
         
-        prediction_cell_type_col = 'prediction_' + reference_col_to_split
+        prediction_cell_type_col = 'prediction_' + col
         confidence_threshold = 0.5 #TODO
 
         generate_script_for_analyze_result(script_home, project_path, i,
