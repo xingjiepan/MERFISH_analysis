@@ -67,10 +67,23 @@ def generate_script_for_integrate_subsets(script_home, project_path, rd, referen
     with open(os.path.join(project_path, f'round{rd}_integrate_subsets.sh'), 'w') as f:
         f.write(script)
 
-def generate_script_for_analyze_result(script_home, project_path, rd, query_adata_file, new_query_adata_file,
-        prediction_col, prediction_proba_col):
+def generate_script_for_analyze_result(script_home, project_path, rd,
+        adata_file_before_integration, prediction_cell_type_col, confidence_threshold):
     '''Generate script for analyzing result of a round.'''
-    pass
+    task_script = os.path.abspath(os.path.join(script_home, 'analyze_integratioin_results.py'))
+    round_path = os.path.abspath(os.path.join(project_path, f'round{rd}'))
+    adata_file_before_integration = os.path.abspath(adata_file_before_integration)
+   
+    cmd = [task_script, '-t', str(confidence_threshold),
+            round_path, adata_file_before_integration, prediction_cell_type_col]
+
+    script = f'''#!/bin/bash
+    
+{' '.join(cmd)}
+    '''
+
+    with open(os.path.join(project_path, f'round{rd}_analyze_integration_result.sh'), 'w') as f:
+        f.write(script)
 
 def initialize_integration_project(script_home, project_path, reference_adata_file, query_adata_file,
         reference_columns_by_rounds):
@@ -108,7 +121,7 @@ def initialize_integration_project(script_home, project_path, reference_adata_fi
         else:
             query_adata_file = os.path.join(project_path, f'round{i-1}', 'integrated.h5ad')
             reference_col_to_split = reference_columns_by_rounds[i - 1]
-            query_col_to_split = 'prediction_' + reference_col_to_split
+            query_col_to_split = 'prediction_' + reference_col_to_split + '_filtered'
 
         reference_adata_file = cleaned_reference_adata_file
         reference_col_cell_type = col
@@ -132,6 +145,19 @@ def initialize_integration_project(script_home, project_path, reference_adata_fi
         slurm=False #TODO
         generate_script_for_integrate_subsets(script_home, project_path, i, reference_col_cell_type, 
                 drop_gene=drop_gene, overwrite=overwrite, n_threads=n_threads, slurm=slurm)
+
+        # Generate the integration analysis script
+   
+        if i == 0:
+            adata_file_before_integration = cleaned_query_adata_file
+        else:
+            adata_file_before_integration = os.path.join(project_path, f'round{i-1}', 'integrated.h5ad')
+        
+        prediction_cell_type_col = 'prediction_' + reference_col_to_split
+        confidence_threshold = 0.5 #TODO
+
+        generate_script_for_analyze_result(script_home, project_path, i,
+            adata_file_before_integration, prediction_cell_type_col, confidence_threshold)
         
 
 
