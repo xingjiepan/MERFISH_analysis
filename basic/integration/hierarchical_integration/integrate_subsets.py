@@ -65,7 +65,7 @@ if __name__ == '__main__':
     parser.add_option('-o', '--overwrite', dest='overwrite', action='store_true',
             help='Overwrite the existing result.')
     parser.add_option('-n', '--n_threads', dest='n_threads', action='store', type='int', default=1,
-            help='The gene to drop during integration.')
+            help='The number of threads for a local run.')
     parser.add_option('-s', '--slurm', dest='slurm', action='store_true',
             help='Run the job on a slurm cluster. The default behavior is running locally.')
 

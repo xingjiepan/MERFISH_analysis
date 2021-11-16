@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+from optparse import OptionParser
 
 import numpy as np
 import anndata
@@ -85,91 +86,95 @@ def generate_script_for_analyze_result(script_home, project_path, rd,
     with open(os.path.join(project_path, f'round{rd}_analyze_integration_result.sh'), 'w') as f:
         f.write(script)
 
-def initialize_integration_project(script_home, project_path, reference_adata_file, query_adata_file,
-        reference_columns_by_rounds):
+def initialize_integration_project(options):
     '''Initialize an integration project.'''
+    # Parse the reference columns
+    reference_columns_by_rounds = options.reference_columns_by_rounds.split(',')
+    assert(not ('root_type' in reference_columns_by_rounds))
+
     # Create the working directory and copy the cleaned anndata files here
-    os.makedirs(project_path, exist_ok=True)
+    os.makedirs(options.project_path, exist_ok=True)
 
     # Save the cleaned data to the project directory
-    cleaned_reference_adata_file = os.path.join(project_path, 'reference.h5ad')
-    reference_adata_cleaned = load_and_clean_adata(reference_adata_file, reference_columns_by_rounds)
+    cleaned_reference_adata_file = os.path.join(options.project_path, 'reference.h5ad')
+    reference_adata_cleaned = load_and_clean_adata(options.reference_adata_file, reference_columns_by_rounds)
     reference_adata_cleaned.obs['root_type'] = 'all'
     reference_adata_cleaned.write(cleaned_reference_adata_file)
 
-    cleaned_query_adata_file = os.path.join(project_path, 'query.h5ad')
-    query_adata_cleaned = load_and_clean_adata(query_adata_file, [])
+    cleaned_query_adata_file = os.path.join(options.project_path, 'query.h5ad')
+    query_adata_cleaned = load_and_clean_adata(options.query_adata_file, [])
     query_adata_cleaned.obs['root_type'] = 'all'
     query_adata_cleaned.write(cleaned_query_adata_file)
 
     # Create the directory structure for each round of integration
-
     for i, col in enumerate(reference_columns_by_rounds):
-        round_dir = os.path.join(project_path, f'round{i}')
+        round_dir = os.path.join(options.project_path, f'round{i}')
         os.makedirs(round_dir, exist_ok=True)
 
     # Generate scripts for integration
-    
     for i, col in enumerate(reference_columns_by_rounds):
 
-        # Generate input preparation scripts
+        impute_gene_expression = False # TODO: implement gene expression imputation
+
+        # The first round has some different parameters
         if i == 0:
-            query_adata_file = cleaned_query_adata_file
+            query_adata_file_current = cleaned_query_adata_file
             reference_col_to_split = 'root_type'
             query_col_to_split = 'root_type'
        
         else:
-            query_adata_file = os.path.join(project_path, f'round{i-1}', 'integrated.h5ad')
+            query_adata_file_current = os.path.join(options.project_path, f'round{i-1}', 'integrated.h5ad')
             reference_col_to_split = reference_columns_by_rounds[i - 1]
             query_col_to_split = 'prediction_' + reference_col_to_split + '_filtered'
 
-        reference_adata_file = cleaned_reference_adata_file
-        reference_col_cell_type = col
-        approximate_subset_size = 1000 #TODO
-        n_repeat_query=3 #TODO
-        min_N_cells_per_cluster=30 #TODO
-        n_threads=16 #TODO
-        impute_gene_expression=False #TODO
-
-        generate_script_for_prepare_inputs(script_home, project_path, i, 
-            reference_adata_file, query_adata_file, 
-            reference_col_to_split, query_col_to_split, reference_col_cell_type,
-            approximate_subset_size, n_repeat_query, min_N_cells_per_cluster, n_threads,
+        # Generate input preparation scripts
+        generate_script_for_prepare_inputs(options.script_home, options.project_path, i, 
+            cleaned_reference_adata_file, query_adata_file_current, 
+            reference_col_to_split, query_col_to_split, col, options.approximate_subset_size, 
+            options.n_repeat_query, options.min_N_cells_per_cluster, options.n_threads,
             impute_gene_expression)
 
         # Generate actual integration script
-        
-        drop_gene=None #TODO
-        overwrite=False #TODO
-        n_threads=16 #TODO
-        slurm=False #TODO
-        generate_script_for_integrate_subsets(script_home, project_path, i, reference_col_cell_type, 
-                drop_gene=drop_gene, overwrite=overwrite, n_threads=n_threads, slurm=slurm)
+        generate_script_for_integrate_subsets(options.script_home, options.project_path, i, 
+                col, drop_gene=options.drop_gene, overwrite=options.overwrite, 
+                n_threads=options.n_threads, slurm=options.slurm)
 
         # Generate the integration analysis script
-   
-        if i == 0:
-            adata_file_before_integration = cleaned_query_adata_file
-        else:
-            adata_file_before_integration = os.path.join(project_path, f'round{i-1}', 'integrated.h5ad')
-        
-        prediction_cell_type_col = 'prediction_' + col
-        confidence_threshold = 0.5 #TODO
-
-        generate_script_for_analyze_result(script_home, project_path, i,
-            adata_file_before_integration, prediction_cell_type_col, confidence_threshold)
+        generate_script_for_analyze_result(options.script_home, options.project_path, i,
+            query_adata_file_current, 'prediction_' + col, options.confidence_threshold)
         
 
 
 if __name__ == '__main__':
-    script_home = '.'
-    project_path = 'test/test_integration_project'
-    reference_adata_file = 'test/scRNAseq_downsample_0.gzip.h5ad'
-    query_adata_file = 'test/merfish_downsample_0.gzip.h5ad'
+    parser = OptionParser()
+    parser.add_option('-i', '--script_home', dest='script_home', action='store', type='string',
+            help='The directory of the integration scripts.')
+    parser.add_option('-p', '--project_path', dest='project_path', action='store', type='string',
+            help='The path to the integration project.')
+    parser.add_option('-q', '--query_adata_file', dest='query_adata_file', action='store', type='string',
+            help='The query h5ad file.')
+    parser.add_option('-r', '--reference_adata_file', dest='reference_adata_file', action='store', type='string',
+            help='The reference h5ad file.')
+    parser.add_option('-c', '--reference_columns_by_rounds', dest='reference_columns_by_rounds', action='store', type='string',
+            help='A comma separated list of column names for each round of integration.')
+    parser.add_option('-a', '--approximate_subset_size', dest='approximate_subset_size', action='store', type='int', default=10000,
+            help='The approximate size of each subset for integration.')
+    parser.add_option('-e', '--n_repeat_query', dest='n_repeat_query', action='store', type='int', default=3,
+            help='The number of repeat for each cell in the query dataset.')
+    parser.add_option('-m', '--min_N_cells_per_cluster', dest='min_N_cells_per_cluster', action='store', type='int', default=50,
+            help='The minimum number of cells in each downsampled subsets.')
+    parser.add_option('-t', '--confidence_threshold', dest='confidence_threshold', action='store', type='float',
+            help='The confidence threshold for filtering integrated cells.')
+    parser.add_option('-d', '--drop_gene', dest='drop_gene', action='store',
+            help='The gene to drop during integration.')
+    parser.add_option('-o', '--overwrite', dest='overwrite', action='store_true',
+            help='Overwrite the existing result.')
+    parser.add_option('-s', '--slurm', dest='slurm', action='store_true',
+            help='Initialize the project for running on a slurm cluster. The default behavior is running locally.')
+    parser.add_option('-n', '--n_threads', dest='n_threads', action='store', type='int', default=1,
+            help='The number of threads for a local run.')
 
-    reference_columns_by_rounds = ['cell_class1', 'seurat_clusters']
-    
+    (options, args) = parser.parse_args()
 
-    initialize_integration_project(script_home, project_path, reference_adata_file, 
-            query_adata_file, reference_columns_by_rounds)
+    initialize_integration_project(options)
 
