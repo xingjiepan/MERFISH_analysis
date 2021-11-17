@@ -200,6 +200,8 @@ d_list <- lapply(X = d_list, FUN = function(x) {
 # Select features that are repeatedly variable across datasets for integration
 features <- SelectIntegrationFeatures(object.list = d_list)
 features = features[features != drop_gene]
+print('Integration using the following genes:')
+print(features)
 
 ## IMPUTATION AND LABEL TRANSFER
 # Find the anchors for imputation and label transfer
