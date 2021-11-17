@@ -70,6 +70,8 @@ def convert_h5ad_to_h5seurat(conversion_script, input_file):
     metadata, ortherwise the underlying R script may crash.
     '''
     conversion_cmd = ['Rscript', '--vanilla', conversion_script, input_file]
+    print('Running command:')
+    print(' '.join(conversion_cmd))
     subprocess.check_call(conversion_cmd)
 
 def generate_one_subset(i, adata, subset_cell_ids, subsets_path, data_file_prefix, conversion_script):
