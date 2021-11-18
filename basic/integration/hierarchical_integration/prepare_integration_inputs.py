@@ -189,12 +189,17 @@ dR <- LoadH5Seurat(ref_file)
 dR <- AddMetaData(dR, factor(c('reference')), col.name = 'source')
 dQ <- LoadH5Seurat(query_file)
 dQ <- AddMetaData(dQ, factor(c('query')), col.name = 'source')
-d_list <- list(dR, dQ)
+
+# Only keep the genes in the query dataset for normalization
+all_query_genes <- rownames(dQ)
+dR_query_genes <- subset(dR, features = all_query_genes)
+
+d_list <- list(dR_query_genes, dQ)
 
 # Normalize and identify variable features for each dataset independently
 d_list <- lapply(X = d_list, FUN = function(x) {
   x <- NormalizeData(x)
-  x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 10000)
+  x <- FindVariableFeatures(x, selection.method = "vst")
 })
 
 # Select features that are repeatedly variable across datasets for integration
@@ -205,7 +210,7 @@ print(features)
 
 ## IMPUTATION AND LABEL TRANSFER
 # Find the anchors for imputation and label transfer
-anchors_t <- FindTransferAnchors(reference = dR, query = dQ, reduction='cca', features=features)
+anchors_t <- FindTransferAnchors(reference = dR_query_genes, query = dQ, reduction='cca', features=features)
 
 # Predict the class labels and same the predictions as a csv file 
 predictions_class_label <- TransferData(anchorset = anchors_t, weight.reduction = 'cca', refdata=dR@meta.data[[cell_type_col]])
