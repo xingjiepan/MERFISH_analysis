@@ -108,8 +108,8 @@ def prepare_integration_inputs_for_one_cell_type(output_path, reference_adata, q
     unnecessary metadata.
     '''
     # Determine the number of subsets to generate
-    N_subsets_reference = max(1, int(reference_adata.shape[0] / approximate_subset_size))
-    N_subsets_query = max(1, int(query_adata.shape[0] / approximate_subset_size))
+    N_subsets_reference = max(1, int(np.ceil(reference_adata.shape[0] / approximate_subset_size)))
+    N_subsets_query = max(1, int(np.ceil(query_adata.shape[0] / approximate_subset_size)))
     
     n_repeat_reference = int(np.ceil(N_subsets_query * n_repeat_query / N_subsets_reference))
     N_subsets_to_write = N_subsets_query * n_repeat_query
