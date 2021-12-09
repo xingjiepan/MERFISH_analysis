@@ -245,11 +245,17 @@ d_integrated <- ScaleData(d_integrated)
 d_integrated <- RunPCA(d_integrated)
 d_integrated <- RunUMAP(d_integrated, dims = 1:50)
 
+# Calculate and save the mixing score for the integration
+d_integrated <- AddMetaData(d_integrated, MixingMetric(d_integrated, 'source', reduction='pca', dims=1:20), 'mixing_score')
+
 # Make splitted copies of the integrated data
 splitted_d_integrated <- SplitObject(d_integrated, split.by='source')
 integrated_query <- AddMetaData(splitted_d_integrated[["query"]], predictions_class_label['prediction.score.max'], col.name = 'prediction.score.max')
 integrated_query <- AddMetaData(integrated_query, predictions_class_label['predicted.id'], col.name = 'predicted.id')
 integrated_ref <- splitted_d_integrated[["reference"]]
+
+# Save the mixing scores of the query cells
+write.csv(integrated_query@meta.data["mixing_score"], paste(output_path, 'query_cell_mixing_scores.csv', sep='/'))
 
 # Plot the co-embedding
 png(filename=paste(output_path, 'coembed.png', sep='/'), width=1024, height=1024)
@@ -281,9 +287,14 @@ png(filename=paste(output_path, 'query_cell_molecule_counts.png', sep='/'), widt
 FeaturePlot(integrated_query, reduction='umap', features = c('nCount_RNA'), cols=c('lightgrey', 'blue'), min.cutoff='q5', max.cutoff='q95')
 dev.off()
 
+# Plot the mixing score each query cell
+png(filename=paste(output_path, 'query_cell_mixing_scores.png', sep='/'), width=1024, height=1024)
+FeaturePlot(integrated_query, reduction='umap', features = c('mixing_score'), cols=c('lightgrey', 'blue'), min.cutoff='q5', max.cutoff='q95')
+dev.off()
+
 # Plot the distributions of query data features
 png(filename=paste(output_path, 'query_cell_features.png', sep='/'), width=1024, height=1024)
-VlnPlot(integrated_query, c('nFeature_RNA', 'prediction.score.max'))
+VlnPlot(integrated_query, c('nFeature_RNA', 'prediction.score.max', 'mixing_score'))
 dev.off()'''
 
     with open(output_file, 'w') as f:
