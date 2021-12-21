@@ -107,6 +107,9 @@ def prepare_integration_inputs_for_one_cell_type(output_path, reference_adata, q
     NOTE: the adata files should already be cleaned to remove all
     unnecessary metadata.
     '''
+    # Adjust the approximate_subset_size such that the query and reference datasets have similar sizes
+    approximate_subset_size = min([approximate_subset_size, reference_adata.shape[0], query_adata.shape[0]])
+
     # Determine the number of subsets to generate
     N_subsets_reference = max(1, int(np.ceil(reference_adata.shape[0] / approximate_subset_size)))
     N_subsets_query = max(1, int(np.ceil(query_adata.shape[0] / approximate_subset_size)))
@@ -148,7 +151,10 @@ def prepare_integration_inputs_for_one_round(output_path, reference_adata_file, 
         output_path_ct = os.path.join(output_path, ct)
         reference_adata_ct = reference_adata[reference_adata.obs[reference_col_to_split] == ct]
         query_adata_ct = query_adata[query_adata.obs[query_col_to_split] == ct]
-        #TODO: deal with the case when there is no cell in the query
+
+        # Only proceed if the cell type exists in the query and reference
+        if reference_adata_ct.shape[0] == 0 or query_adata_ct.shape[0] == 0:
+            continue
 
         prepare_integration_inputs_for_one_cell_type(output_path_ct, reference_adata_ct, query_adata_ct,
                 reference_cell_type_column, query_cell_type_column, approximate_subset_size=approximate_subset_size,
