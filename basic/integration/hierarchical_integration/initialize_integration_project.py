@@ -141,7 +141,7 @@ def initialize_integration_project(options):
 
         # Generate the integration analysis script
         generate_script_for_analyze_result(options.script_home, options.project_path, i,
-            query_adata_file_current, 'prediction_' + col, options.confidence_threshold)
+            query_adata_file_current, 'prediction_' + col, options.mixing_threshold)
         
 
 
@@ -163,8 +163,8 @@ if __name__ == '__main__':
             help='The number of repeat for each cell in the query dataset.')
     parser.add_option('-m', '--min_N_cells_per_cluster', dest='min_N_cells_per_cluster', action='store', type='int', default=50,
             help='The minimum number of cells in each downsampled subsets.')
-    parser.add_option('-t', '--confidence_threshold', dest='confidence_threshold', action='store', type='float',
-            help='The confidence threshold for filtering integrated cells.')
+    parser.add_option('-t', '--mixing_threshold', dest='mixing_threshold', action='store', type='float',
+            help='The mixing score threshold for filtering integrated cells.')
     parser.add_option('-d', '--drop_gene', dest='drop_gene', action='store',
             help='The gene to drop during integration.')
     parser.add_option('-o', '--overwrite', dest='overwrite', action='store_true',
