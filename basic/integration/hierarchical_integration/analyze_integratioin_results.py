@@ -27,7 +27,7 @@ def load_integrated_cell_types(cell_type_files, mixing_score_files):
         ms_df = pd.read_csv(mixing_score_files[i])
         ct_df = ct_df.merge(ms_df, left_on='Unnamed: 0', right_on='Unnamed: 0', how='inner')
 
-        cell_ids = list(ct_df.iloc[:,0])
+        cell_ids = [str(x) for x in ct_df.iloc[:,0]]
         p_types = list(ct_df['predicted.id'])
         p_probas = list(ct_df['prediction.score.max'])
         m_scores = list(ct_df['mixing_score'])
