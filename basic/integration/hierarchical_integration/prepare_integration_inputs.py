@@ -160,7 +160,8 @@ def prepare_integration_inputs_for_one_round(output_path, reference_adata_file, 
                 reference_cell_type_column, query_cell_type_column, approximate_subset_size=approximate_subset_size,
                 n_repeat_query=n_repeat_query, min_N_cells_per_cluster=min_N_cells_per_cluster, n_threads=n_threads)
 
-def generate_seurat_integration_script(output_file, impute_gene_expression=True, plot_coembedding=True):
+def generate_seurat_integration_script(output_file, impute_gene_expression=True, plot_coembedding=True,
+                                       continuous_columns_to_impute=[]):
     '''Generate an R script for integration using Seurat.'''
     script = '''# R script for integrating a query Seurat dataset to a reference Seurat dataset.
 # Usage:
@@ -221,6 +222,14 @@ anchors_t <- FindTransferAnchors(reference = dR_query_genes, query = dQ, reducti
 # Predict the class labels and same the predictions as a csv file 
 predictions_class_label <- TransferData(anchorset = anchors_t, weight.reduction = 'cca', refdata=dR@meta.data[[cell_type_col]])
 write.csv(as.data.frame(predictions_class_label), paste(output_path, 'predicted_cell_types.csv', sep='/'))
+'''
+    if len(continuous_columns_to_impute) > 0:
+        cont_col_string = 'c(' + ','.join(["'" + c + "'" for c in continuous_columns_to_impute]) + ')'
+        script += f'''
+# Impute the continuous values in selected columns
+ref_cont_values = t(data.matrix(dR@meta.data[{cont_col_string}]))
+predicted_cont_values = TransferData(anchorset=anchors_t, weight.reduction='cca', refdata=ref_cont_values)
+write.csv(as.data.frame(Transpose(predicted_cont_values@data)), paste(output_path, 'predicted_cont_values.csv', sep='/'))
 '''
     if impute_gene_expression:
         script += '''
@@ -317,6 +326,9 @@ if __name__ == '__main__':
             help='The gene to drop during integration.')
     parser.add_option('-i', '--impute', dest='impute', action='store_true',
             help='Impute gene expression.')
+    parser.add_option('--continuous_columns_to_impute', dest='continuous_columns_to_impute', 
+            action='store', type='string', default='',
+            help='A comma separated list of column names for continuous variables to be imputed')
 
     (options, args) = parser.parse_args()
     
@@ -334,8 +346,14 @@ if __name__ == '__main__':
     impute_gene_expression = options.impute
 
     # Generate the integration script
+    if len(options.continuous_columns_to_impute) > 0:
+        continuous_columns_to_impute = options.continuous_columns_to_impute.split(',')
+    else: 
+        continuous_columns_to_impute = []
+    
     generate_seurat_integration_script(os.path.join(output_path, 'integrate.R'), 
-            impute_gene_expression=impute_gene_expression, plot_coembedding=True)
+            impute_gene_expression=impute_gene_expression, plot_coembedding=True,
+            continuous_columns_to_impute=continuous_columns_to_impute)
 
     # Generate the input data
     prepare_integration_inputs_for_one_round(output_path, reference_adata_file, query_adata_file, 

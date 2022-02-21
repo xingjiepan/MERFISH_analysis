@@ -19,7 +19,7 @@ def generate_script_for_prepare_inputs(script_home, project_path, rd,
         reference_adata_file, query_adata_file, 
         reference_col_to_split, query_col_to_split, reference_col_cell_type,
         approximate_subset_size, n_repeat_query=3, min_N_cells_per_cluster=30, n_threads=1,
-        impute_gene_expression=False):
+        impute_gene_expression=False, continuous_columns_to_impute=[]):
     '''Generate script for preparing inputs of a round.'''
     
     task_script = os.path.abspath(os.path.join(script_home, 'prepare_integration_inputs.py'))
@@ -30,7 +30,10 @@ def generate_script_for_prepare_inputs(script_home, project_path, rd,
     cmd = [task_script, '-r', str(n_repeat_query), '-m', str(min_N_cells_per_cluster), 
             '-n', str(n_threads)]
     if impute_gene_expression:
-        cmd.appen('-i')
+        cmd.append('-i')
+    
+    if len(continuous_columns_to_impute) > 0:
+        cmd += ['--continuous_columns_to_impute', ','.join(continuous_columns_to_impute)]
 
     cmd += [output_path, reference_adata_file, query_adata_file, reference_col_to_split,
             query_col_to_split, reference_col_cell_type, str(approximate_subset_size)]
@@ -90,6 +93,12 @@ def initialize_integration_project(options):
     '''Initialize an integration project.'''
     # Parse the reference columns
     reference_columns_by_rounds = options.reference_columns_by_rounds.split(',')
+    
+    if not (options.continuous_columns_to_impute is None):
+        continuous_columns_to_impute = options.continuous_columns_to_impute.split(',')
+    else: 
+        continuous_columns_to_impute = []
+
     assert(not ('root_type' in reference_columns_by_rounds))
 
     # Create the working directory and copy the cleaned anndata files here
@@ -97,7 +106,8 @@ def initialize_integration_project(options):
 
     # Save the cleaned data to the project directory
     cleaned_reference_adata_file = os.path.join(options.project_path, 'reference.h5ad')
-    reference_adata_cleaned = load_and_clean_adata(options.reference_adata_file, reference_columns_by_rounds)
+    reference_adata_cleaned = load_and_clean_adata(options.reference_adata_file, 
+            reference_columns_by_rounds + continuous_columns_to_impute)
     reference_adata_cleaned.obs['root_type'] = 'all'
     reference_adata_cleaned.write(cleaned_reference_adata_file)
 
@@ -132,7 +142,7 @@ def initialize_integration_project(options):
             cleaned_reference_adata_file, query_adata_file_current, 
             reference_col_to_split, query_col_to_split, col, options.approximate_subset_size, 
             options.n_repeat_query, options.min_N_cells_per_cluster, options.n_threads,
-            impute_gene_expression)
+            impute_gene_expression, continuous_columns_to_impute=continuous_columns_to_impute)
 
         # Generate actual integration script
         generate_script_for_integrate_subsets(options.script_home, options.project_path, i, 
@@ -155,8 +165,11 @@ if __name__ == '__main__':
             help='The query h5ad file.')
     parser.add_option('-r', '--reference_adata_file', dest='reference_adata_file', action='store', type='string',
             help='The reference h5ad file.')
-    parser.add_option('-c', '--reference_columns_by_rounds', dest='reference_columns_by_rounds', action='store', type='string',
+    parser.add_option('-c', '--reference_columns_by_rounds', dest='reference_columns_by_rounds', 
+            action='store', type='string', default='',
             help='A comma separated list of column names for each round of integration.')
+    parser.add_option('--continuous_columns_to_impute', dest='continuous_columns_to_impute', action='store', type='string',
+            help='A comma separated list of column names for continuous variables to be imputed')
     parser.add_option('-a', '--approximate_subset_size', dest='approximate_subset_size', action='store', type='int', default=10000,
             help='The approximate size of each subset for integration.')
     parser.add_option('-e', '--n_repeat_query', dest='n_repeat_query', action='store', type='int', default=3,
