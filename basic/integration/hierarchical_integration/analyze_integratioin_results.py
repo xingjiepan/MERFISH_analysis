@@ -93,7 +93,75 @@ def get_predicted_types_and_confidences(integration_path):
     ic_dict = load_integrated_cell_types(cell_type_files, mixing_score_files)
 
     return calculate_predicted_type_and_confidence(ic_dict)
+
+def load_predicted_continuous_variable(predicted_variable_files):
+    '''Load the predicted continuous variables into a dictionary.
+    The keys are cell ids and the values are the values of the predicted variables.
+    Return the dictionary and the column names
+    '''
+    pv_dict = {}
+    column_names = []
+
+    for i, pv_file in enumerate(predicted_variable_files):
+        print(f'Load integration result from {i}th file {pv_file}')
+        pv_df = pd.read_csv(pv_file)
+        column_names = pv_df.columns[1:]
+
+        cell_ids = [str(x) for x in pv_df.iloc[:,0]]
+        pv_values = np.array(pv_df)[:, 1:]
+
+        for j in range(pv_df.shape[0]):
+            
+            cid = cell_ids[j]
+            if not (cid in pv_dict):
+                pv_dict[cid] = []
+
+            pv_dict[cid].append(pv_values[j])
+                
+    return pv_dict, column_names
+
+def calculate_predicted_continuous_variables(pv_dict, column_names):
+    '''Caculate the predicted continous variables from multiple results
+    from multiple integration batches.
+    '''
+   
+    cids = []
+    pv_means = []
+
+    for cid in pv_dict:
+        cids.append(cid)
+
+        pv_s = pv_dict[cid]
+        pv_means.append(np.mean(pv_s, axis=0))
+        
+    pv_means = np.array(pv_means)
     
+    d = {'id':cids}
+    for i in range(len(column_names)):
+        d[column_names[i]] = pv_means[:, i]
+
+    return pd.DataFrame(d).set_index('id')
+
+def get_predicted_continuous_variables(integration_path):
+    '''Get the predicted values of continous variables for each cell.'''
+    # Find all the prediction files
+    predicted_variable_files = []
+    
+    for f in os.listdir(integration_path):
+        subsets_path = os.path.join(integration_path, f, 'subsets')
+        if os.path.exists(subsets_path):
+            for ff in os.listdir(subsets_path):
+                
+                pv_file = os.path.join(subsets_path, ff, 'integrated', 'predicted_cont_values.csv')
+                if os.path.exists(pv_file):
+                    predicted_variable_files.append(pv_file)
+
+    # Load all predicted values
+    pv_dict, column_names = load_predicted_continuous_variable(predicted_variable_files)
+    
+    return calculate_predicted_continuous_variables(pv_dict, column_names)
+
+
 def analyze_integration_result(integration_path, adata_file_before_integration, 
         prediction_cell_type_col, mixing_threshold=100):
     '''Analyze the integration result and save it as an anndata file.'''
@@ -112,6 +180,19 @@ def analyze_integration_result(integration_path, adata_file_before_integration,
     # Load the existing adata and add the integration information
     adata = anndata.read_h5ad(adata_file_before_integration)
     adata.obs = adata.obs.merge(ct_prediction_df, left_index=True, right_index=True, how='left')
+
+    # Load the predicted continous varaibles
+    cont_v_prediction_df = get_predicted_continuous_variables(integration_path)
+    cont_v_prediction_df_all_id = adata.obs[[]].merge(cont_v_prediction_df, how='left', left_index=True, right_index=True)
+    # Update the predicted variables stored in the adata
+    for c in cont_v_prediction_df_all_id.columns:
+        if c in adata.obs.columns:
+            ids_to_update = ~cont_v_prediction_df_all_id[c].isnull()
+            adata.obs.loc[ids_to_update, c] = cont_v_prediction_df_all_id.loc[ids_to_update, c]
+        else:
+            adata.obs[c] = cont_v_prediction_df_all_id[c]
+
+        adata.obs[c] = adata.obs[c].astype(float)
 
     # Save the new adata file
     output_file = os.path.join(integration_path, 'integrated.h5ad')
