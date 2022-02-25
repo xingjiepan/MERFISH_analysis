@@ -140,9 +140,10 @@ def generate_subsets(adata, N_subsets, n_repeat, N_subsets_to_write,
             generate_one_subset(i, adata, subsets_path, data_file_prefix, conversion_script)
 
     # Generate the subsets in prallel
-    with Pool(n_threads) as p:
-        p.starmap(generate_one_subset, [(i, adata, subsets_path, data_file_prefix, conversion_script) 
-            for i in range(N_subsets_to_write)])
+    else:
+        with Pool(n_threads) as p:
+            p.starmap(generate_one_subset, [(i, adata, subsets_path, data_file_prefix, conversion_script) 
+                for i in range(N_subsets_to_write)])
 
 def prepare_integration_inputs_for_one_cell_type(output_path, reference_adata, query_adata, 
         reference_cell_type_column, query_cell_type_column, approximate_subset_size=10000,
