@@ -189,9 +189,10 @@ def prepare_integration_inputs_for_one_round(output_path, reference_adata_file, 
     cell_types_to_split = np.unique(reference_adata.obs[reference_col_to_split])
 
     # Generate inputs for each splitted cell type
-    for ct in cell_types_to_split: 
-        print(f'Generating integration inputs for {reference_col_to_split}:{ct}.')
-        
+    for i, ct in enumerate(cell_types_to_split): 
+        print(f'\nGenerating integration inputs for {reference_col_to_split}:{ct}.')
+        print(f'This is the {i+1} / {len(cell_types_to_split)} cell types.') 
+
         output_path_ct = os.path.join(output_path, ct)
         reference_adata_ct = reference_adata[reference_adata.obs[reference_col_to_split] == ct]
         query_adata_ct = query_adata[query_adata.obs[query_col_to_split] == ct]
