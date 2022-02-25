@@ -134,6 +134,11 @@ def generate_subsets(adata, N_subsets, n_repeat, N_subsets_to_write,
         for i in range(N_subsets_to_write):
             save_cells_ids_for_subsets(i, all_subset_cell_ids[i], subsets_path, data_file_prefix)
 
+    # Generate the subsets sequentially
+    if n_threads == 1:
+        for i in range(N_subsets_to_write):
+            generate_one_subset(i, adata, subsets_path, data_file_prefix, conversion_script)
+
     # Generate the subsets in prallel
     with Pool(n_threads) as p:
         p.starmap(generate_one_subset, [(i, adata, subsets_path, data_file_prefix, conversion_script) 
