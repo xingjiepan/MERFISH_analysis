@@ -82,7 +82,8 @@ def all_cell_id_files_already_exist(N_subsets_to_write, subsets_path, data_file_
         if not os.path.exists(cell_id_file): 
             all_exist = False
 
-    print(f'All cell id files under {subsets_path} already exist.')
+    if all_exist:
+        print(f'All cell id files under {subsets_path} already exist.')
     return all_exist
 
 def save_cells_ids_for_subsets(i, subset_cell_ids, subsets_path, data_file_prefix, overwrite=True):
