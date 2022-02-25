@@ -74,9 +74,38 @@ def convert_h5ad_to_h5seurat(conversion_script, input_file):
     print(' '.join(conversion_cmd))
     subprocess.check_call(conversion_cmd)
 
-def generate_one_subset(i, adata, subset_cell_ids, subsets_path, data_file_prefix, conversion_script):
+def all_cell_id_files_already_exist(N_subsets_to_write, subsets_path, data_file_prefix):
+    all_exist = True
+
+    for i in range(N_subsets_to_write):
+        cell_id_file = os.path.join(subsets_path, str(i), f'{data_file_prefix}_ids.csv')
+        if not os.path.exists(cell_id_file): 
+            all_exist = False
+
+    print(f'All cell id files under {subsets_path} already exist.')
+    return all_exist
+
+def save_cells_ids_for_subsets(i, subset_cell_ids, subsets_path, data_file_prefix, overwrite=True):
+    '''Save the cell ids for each subset of integration.'''
+    os.makedirs(os.path.join(subsets_path, str(i), 'integrated'), exist_ok=True)
+    cell_id_file = os.path.join(subsets_path, str(i), f'{data_file_prefix}_ids.csv')
+
+    if os.path.exists(cell_id_file) and (not overwrite):
+        return
+
+    pd.DataFrame({'cell_ids':subset_cell_ids}).to_csv(cell_id_file, header=False, index=False)
+
+def generate_one_subset(i, adata, subsets_path, data_file_prefix, conversion_script, overwrite=False):
+    final_output = os.path.join(subsets_path, str(i), f'{data_file_prefix}.gzip.h5seurat')
+    if os.path.exists(final_output) and (not overwrite):
+        print(f'The file {final_output} already exists.')
+        return
+
     print(f'Generating the subset {data_file_prefix}_{i}.')
-    adata_ds = adata[adata.obs.index.isin(subset_cell_ids[i])]
+    cell_id_file = os.path.join(subsets_path, str(i), f'{data_file_prefix}_ids.csv')
+    subset_cell_ids =  np.array(pd.read_csv(cell_id_file, header=None).iloc[:, 0])
+
+    adata_ds = adata[adata.obs.index.isin(subset_cell_ids)]
     os.makedirs(os.path.join(subsets_path, str(i), 'integrated'), exist_ok=True)
     
     output_file = os.path.join(subsets_path, str(i), f'{data_file_prefix}.gzip.h5ad')
@@ -87,17 +116,26 @@ def generate_one_subset(i, adata, subset_cell_ids, subsets_path, data_file_prefi
 def generate_subsets(adata, N_subsets, n_repeat, N_subsets_to_write, 
         cell_type_column, min_N_cells_per_cluster,
         subsets_path, conversion_script, data_file_prefix,
-        n_threads=1):
+        n_threads=1, overwrite=False):
     '''Generate the subsets of a dataset.'''
     
     print(f'Determining the cell IDs for {data_file_prefix} subsets.')
-    subset_cell_ids = []
-    for i in range(n_repeat):
-        subset_cell_ids += balanced_divide(adata.obs, cell_type_column, N_subsets, min_N_cells_per_cluster)
+    # Check if cell IDs for each subset are already generated
+    all_exist = all_cell_id_files_already_exist(N_subsets_to_write, subsets_path, data_file_prefix) 
+
+    # If not all cell_id files already exist, generate all files 
+    if not all_exist:
+        all_subset_cell_ids = []
+        for i in range(n_repeat):
+            all_subset_cell_ids += balanced_divide(adata.obs, cell_type_column, N_subsets, min_N_cells_per_cluster)
+
+        # Save the cell IDs for each subset
+        for i in range(N_subsets_to_write):
+            save_cells_ids_for_subsets(i, all_subset_cell_ids[i], subsets_path, data_file_prefix)
 
     # Generate the subsets in prallel
     with Pool(n_threads) as p:
-        p.starmap(generate_one_subset, [(i, adata, subset_cell_ids, subsets_path, data_file_prefix, conversion_script) 
+        p.starmap(generate_one_subset, [(i, adata, subsets_path, data_file_prefix, conversion_script) 
             for i in range(N_subsets_to_write)])
 
 def prepare_integration_inputs_for_one_cell_type(output_path, reference_adata, query_adata, 
