@@ -407,3 +407,4 @@ if __name__ == '__main__':
         reference_col_cell_type, None, approximate_subset_size=approximate_subset_size,
         n_repeat_query=n_repeat_query, min_N_cells_per_cluster=min_N_cells_per_cluster, n_threads=n_threads)
 
+    print('Finished preparing inputs.')
