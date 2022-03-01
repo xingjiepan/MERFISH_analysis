@@ -7,7 +7,6 @@ import numpy as np
 import anndata
 
 
-
 def load_and_clean_adata(adata_file, obs_columns_to_keep):
     '''Clean an adata file by removing all metadata except for specified
     columns.'''
@@ -19,7 +18,7 @@ def generate_script_for_prepare_inputs(script_home, project_path, rd,
         reference_adata_file, query_adata_file, 
         reference_col_to_split, query_col_to_split, reference_col_cell_type,
         approximate_subset_size, n_repeat_query=3, min_N_cells_per_cluster=30, n_threads=1,
-        impute_gene_expression=False, continuous_columns_to_impute=[]):
+        impute_gene_expression=False, continuous_columns_to_impute=[], harvard_rc=False):
     '''Generate script for preparing inputs of a round.'''
     
     task_script = os.path.abspath(os.path.join(script_home, 'prepare_integration_inputs.py'))
@@ -38,7 +37,32 @@ def generate_script_for_prepare_inputs(script_home, project_path, rd,
     cmd += [output_path, reference_adata_file, query_adata_file, reference_col_to_split,
             query_col_to_split, reference_col_cell_type, str(approximate_subset_size)]
 
-    script = f'''#!/bin/bash
+    if harvard_rc:
+        script = f'''#!/bin/bash
+#SBATCH --job-name=integrate_
+#SBATCH -c 1                # Number of cores (-c)
+#SBATCH -t 0-24:00          # Runtime in D-HH:MM
+#SBATCH -p zhuang   # Partition to submit to
+#SBATCH --mem-per-cpu=48000           # Memory pool for all cores (see also --mem-per-cpu)
+#SBATCH -o slurm_job_outputs/output_%j.out  # File to which STDOUT will be written, %j inserts jobid
+#SBATCH -e slurm_job_outputs/output_%j.err  # File to which STDERR will be written, %j inserts jobid
+#SBATCH --account=zhuang_lab
+#SBATCH --exclude=holyzhuang01,holy2a15313,holy2c[093301,093302,093401,093402,01213,01214] # Some nodes fail to run the job
+
+# Load the module for the correct version of hdf5
+module load gcc/10.2.0-fasrc01 openmpi/4.1.1-fasrc01 hdf5/1.12.1-fasrc01
+
+# Load the module for R
+module load R_core/4.0.5-fasrc01
+
+# Load the R packages
+module load R_packages/4.0.5-fasrc01
+
+{' '.join(cmd)}
+'''
+    os.makedirs(os.path.join(project_path, 'slurm_job_outputs')), exist_ok=True)
+    else:
+        script = f'''#!/bin/bash
     
 {' '.join(cmd)}
     '''
@@ -47,7 +71,7 @@ def generate_script_for_prepare_inputs(script_home, project_path, rd,
         f.write(script)
 
 def generate_script_for_integrate_subsets(script_home, project_path, rd, reference_col_cell_type, 
-        drop_gene=None, overwrite=False, n_threads=1, slurm=False):
+        drop_gene=None, overwrite=False, n_threads=1, slurm_script=''):
     '''Generate script for integrating subsets of a round.'''
     task_script = os.path.abspath(os.path.join(script_home, 'integrate_subsets.py'))
     round_path = os.path.abspath(os.path.join(project_path, f'round{rd}'))
@@ -58,8 +82,8 @@ def generate_script_for_integrate_subsets(script_home, project_path, rd, referen
         cmd += ['-d', drop_gene]
     if overwrite:
         cmd.append('-o')
-    if slurm:
-        cmd.append('-s')
+    if len(slurm_script) > 0:
+        cmd += ['-s', os.path.abspath(slurm_script)]
 
     cmd += [round_path, reference_col_cell_type]
 
@@ -138,16 +162,22 @@ def initialize_integration_project(options):
             query_col_to_split = 'prediction_' + reference_col_to_split + '_filtered'
 
         # Generate input preparation scripts
+        if len(options.slurm_script) > 0:
+            harvard_rc = True
+        else:
+            harvard_rc = False
+
         generate_script_for_prepare_inputs(options.script_home, options.project_path, i, 
             cleaned_reference_adata_file, query_adata_file_current, 
             reference_col_to_split, query_col_to_split, col, options.approximate_subset_size, 
             options.n_repeat_query, options.min_N_cells_per_cluster, options.n_threads,
-            impute_gene_expression, continuous_columns_to_impute=continuous_columns_to_impute)
+            impute_gene_expression, continuous_columns_to_impute=continuous_columns_to_impute,
+            harvard_rc=harvard_rc)
 
         # Generate actual integration script
         generate_script_for_integrate_subsets(options.script_home, options.project_path, i, 
                 col, drop_gene=options.drop_gene, overwrite=options.overwrite, 
-                n_threads=options.n_threads, slurm=options.slurm)
+                n_threads=options.n_threads, slurm_script=options.slurm_script)
 
         # Generate the integration analysis script
         generate_script_for_analyze_result(options.script_home, options.project_path, i,
@@ -182,8 +212,8 @@ if __name__ == '__main__':
             help='The gene to drop during integration.')
     parser.add_option('-o', '--overwrite', dest='overwrite', action='store_true',
             help='Overwrite the existing result.')
-    parser.add_option('-s', '--slurm', dest='slurm', action='store_true',
-            help='Initialize the project for running on a slurm cluster. The default behavior is running locally.')
+    parser.add_option('-s', '--slurm_script', dest='slurm_script', action='store', type='string', default='',
+            help='If a slurm submission script is provided, use it to run jobs on a slurm cluster.')
     parser.add_option('-n', '--n_threads', dest='n_threads', action='store', type='int', default=1,
             help='The number of threads for a local run.')
 

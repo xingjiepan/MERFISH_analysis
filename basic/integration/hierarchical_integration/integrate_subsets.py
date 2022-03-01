@@ -54,9 +54,40 @@ def integrate_all_subsets_local(integration_path, cell_type_col, drop_gene=None,
     with Pool(n_threads) as p:
         p.starmap(integrate_one_subset, integration_args) 
  
-def integrate_all_subsets_slurm():
-    #TODO:implement
-    pass
+def integrate_all_subsets_slurm(integration_path, cell_type_col, slurm_integration_submission_script,
+        drop_gene=None, overwrite=False):
+    '''Submit the integration jobs on a slurm cluster.'''
+    integration_script = os.path.join(integration_path, 'integrate.R')
+
+    if drop_gene is None:
+        drop_gene = ''
+
+    os.makedirs('slurm_job_outputs', exist_ok=True)
+
+    # Find all subsets for integration
+    integration_args = []
+    for f in os.listdir(integration_path):
+        subsets_path = os.path.join(integration_path, f, 'subsets')
+
+        if not os.path.exists(subsets_path):
+            continue
+
+        for p in os.listdir(subsets_path):
+            subset_path = os.path.join(subsets_path, p)
+            
+            # Check if the job is already finished
+            done_file = os.path.join(subset_path, 'integrated', 'done.txt')
+            if (not overwrite) and os.path.exists(done_file):
+                continue
+            
+            # Submit the integration job
+            if (not overwrite) and os.path.exists(done_file):
+                print(f'Submit the integration job for {subset_path}.')
+                cmd = ['sbatch',
+                       f'--export=INTEGRATION_SCRIPT={integration_script},SUBSET_PATH={subset_path},CELL_TYPE_COL={cell_type_col},DROP_GENE={drop_gene}', 
+                       slurm_integration_submission_script]
+                subprocess.check_call(cmd)
+
 
 if __name__ == '__main__':
     parser = OptionParser()
@@ -66,12 +97,15 @@ if __name__ == '__main__':
             help='Overwrite the existing result.')
     parser.add_option('-n', '--n_threads', dest='n_threads', action='store', type='int', default=1,
             help='The number of threads for a local run.')
-    parser.add_option('-s', '--slurm', dest='slurm', action='store_true',
-            help='Run the job on a slurm cluster. The default behavior is running locally.')
+    parser.add_option('-s', '--slurm_script', dest='slurm_script', action='store', type='string', default='',
+            help='If a slurm submission script is provided, use it to run jobs on a slurm cluster.')
 
     (options, args) = parser.parse_args()
     integration_path, cell_type_col = args
 
-    if not options.slurm:
+    if len(options.slurm_script) == 0:
         integrate_all_subsets_local(integration_path, cell_type_col, drop_gene=options.drop_gene,
                 overwrite=options.overwrite, n_threads=options.n_threads)
+
+    else:
+        integrate_all_subsets_slurm(integration_path, cell_type_col, options.slurm_script, drop_gene=options.drop_gene)
