@@ -1,4 +1,4 @@
-!/bin/bash
+#!/bin/bash
 #SBATCH --job-name=integrate_
 #SBATCH -c 1                # Number of cores (-c)
 #SBATCH -t 0-03:00          # Runtime in D-HH:MM

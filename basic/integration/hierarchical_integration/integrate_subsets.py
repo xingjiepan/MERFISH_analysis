@@ -81,12 +81,11 @@ def integrate_all_subsets_slurm(integration_path, cell_type_col, slurm_integrati
                 continue
             
             # Submit the integration job
-            if (not overwrite) and os.path.exists(done_file):
-                print(f'Submit the integration job for {subset_path}.')
-                cmd = ['sbatch',
-                       f'--export=INTEGRATION_SCRIPT={integration_script},SUBSET_PATH={subset_path},CELL_TYPE_COL={cell_type_col},DROP_GENE={drop_gene}', 
-                       slurm_integration_submission_script]
-                subprocess.check_call(cmd)
+            print(f'Submit the integration job for {subset_path}.')
+            cmd = ['sbatch',
+                   f'--export=INTEGRATION_SCRIPT={integration_script},SUBSET_PATH={subset_path},CELL_TYPE_COL={cell_type_col},DROP_GENE={drop_gene}', 
+                   slurm_integration_submission_script]
+            subprocess.check_call(cmd)
 
 
 if __name__ == '__main__':

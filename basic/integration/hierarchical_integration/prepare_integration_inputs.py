@@ -408,3 +408,5 @@ if __name__ == '__main__':
         n_repeat_query=n_repeat_query, min_N_cells_per_cluster=min_N_cells_per_cluster, n_threads=n_threads)
 
     print('Finished preparing inputs.')
+    with open(os.path.join(output_path, 'prepare_inputs.done'), 'w') as f:
+        f.write('')

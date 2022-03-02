@@ -60,7 +60,7 @@ module load R_packages/4.0.5-fasrc01
 
 {' '.join(cmd)}
 '''
-    os.makedirs(os.path.join(project_path, 'slurm_job_outputs')), exist_ok=True)
+        os.makedirs(os.path.join(project_path, 'slurm_job_outputs'), exist_ok=True)
     else:
         script = f'''#!/bin/bash
     
