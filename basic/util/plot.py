@@ -1,4 +1,6 @@
 import matplotlib
+import matplotlib.pyplot as plt
+
 
 def get_color_mapping_df(ordered_labels, cmap_name='gist_ncar'):
     '''Get a dataframe that maps a list of ordered labels

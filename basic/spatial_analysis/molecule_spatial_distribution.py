@@ -5,6 +5,17 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+def load_barcode_files_under_dir(barcode_dump_path):
+    '''Load barcode files under a given directory.'''
+    barcode_files = [os.path.join(barcode_dump_path, f) for f in os.listdir(barcode_dump_path)
+                                                         if f.endswith('.h5')]
+    df_list = [] 
+    for bf in barcode_files:
+        print(f'Load barcodes in {bf}')
+        df_list.append(pd.read_hdf(bf))
+
+    return pd.concat(df_list) 
+
 def calc_pairwise_distances_between_points(P1:np.ndarray, P2:np.ndarray) -> np.ndarray:
     '''Calculate paiwise distances between two arrays of points.
     Return a matrix of pairwise distances.
