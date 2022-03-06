@@ -21,6 +21,7 @@ def make_frameless_scatter_plot(X, Y, colors, size=0.1):
     ax.scatter(X, Y, c=colors, 
            s=size, marker='.', edgecolor='none', rasterized=True)
 
+    ax.set_aspect('equal')
     ax.set_axis_off()
     return ax
 
