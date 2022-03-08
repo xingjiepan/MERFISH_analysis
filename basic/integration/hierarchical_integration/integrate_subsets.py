@@ -50,10 +50,13 @@ def integrate_all_subsets_local(integration_path, cell_type_col, drop_gene=None,
             integration_args += [(os.path.join(subsets_path, p), 
             integration_script, cell_type_col, drop_gene, overwrite) 
             for p in os.listdir(subsets_path)]
-    
-    with Pool(n_threads) as p:
-        p.starmap(integrate_one_subset, integration_args) 
- 
+   
+    try:
+        with Pool(n_threads) as p:
+            p.starmap(integrate_one_subset, integration_args) 
+    except subprocess.CalledProcessError as e:
+        print("command '{0}' return with error (code {1}): {2}".format(e.cmd, e.returncode, e.output))
+
 def integrate_all_subsets_slurm(integration_path, cell_type_col, slurm_integration_submission_script,
         drop_gene=None, overwrite=False):
     '''Submit the integration jobs on a slurm cluster.'''
