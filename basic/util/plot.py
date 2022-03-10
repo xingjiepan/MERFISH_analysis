@@ -26,4 +26,19 @@ def make_frameless_scatter_plot(X, Y, colors, size=0.1):
     ax.set_axis_off()
     return ax
 
-
+def make_graph_plot(X, Y, edges, colors, size=0.1, linewidth=0.005):
+    '''Plot a graph.'''
+    fig, ax = plt.subplots()
+    
+    # Plot the edges
+    for e in edges:
+        ex = [X[e[0]], X[e[1]]] 
+        ey = [Y[e[0]], Y[e[1]]]
+        ax.plot(ex, ey, color='black', alpha=0.3, linewidth=linewidth, rasterized=True, zorder=1)
+    
+    # Plot the nodes
+    ax.scatter(X, Y, c=colors, 
+           s=size, marker='.', edgecolor='none', rasterized=True, zorder=2)
+    
+    ax.set_aspect('equal')
+    ax.set_axis_off()
