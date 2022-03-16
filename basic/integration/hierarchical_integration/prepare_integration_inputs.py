@@ -8,6 +8,7 @@ from optparse import OptionParser
 
 import numpy as np
 import pandas as pd
+import scipy.sparse
 import anndata
 
 
@@ -48,31 +49,71 @@ def balanced_divide(df_cell_types, cluster_column, N_subsets, min_N_cells_per_cl
     
     return cell_ids
 
-def generate_h5ad_to_h5seurat_conversion_R_script(output_file):
+def generate_h5seurat_conversion_R_script(script_file):
     '''Generate a R script to convert a h5ad file to a h5seurat file.'''
     script = '''# R script for converting an h5ad file to a Seurat h5 file
 # Usage:
-# Rscript --vanilla convert_anndata_to_seurat.R input_file
+# Rscript --vanilla convert_anndata_to_seurat.R mtx_file cells_file features_file metadata_file output_file
 
+library(Seurat)
 library(SeuratDisk)
+library(Matrix)
+library(reticulate)
 
 args = commandArgs(trailingOnly=TRUE)
-input_file = args[1]
+mtx_file = args[1]
+cells_file = args[2]
+features_file = args[3]
+metadata_file = args[4]
+output_file = args[5]
 
-Convert(input_file, dest='h5seurat', overwrite=TRUE, verbose=TRUE)'''
+cells = read.csv(cells_file, colClasses=c("character"), header=FALSE)
+features = read.csv(features_file, colClasses=c("character"), header=FALSE)
+metadata = read.csv(metadata_file)
+attr(metadata, "row.names") = cells[[1]]
 
-    with open(output_file, 'w') as f:
+scipy = import("scipy.sparse")
+m = scipy$load_npz(mtx_file)
+
+m@Dimnames[[1]] = cells[[1]]
+m@Dimnames[[2]] = features[[1]]
+
+seurat_object <- CreateSeuratObject(counts=t(m), meta.data=metadata)
+
+SaveH5Seurat(seurat_object, output_file, overwrite=TRUE)'''
+
+    with open(script_file, 'w') as f:
         f.write(script)
 
-def convert_h5ad_to_h5seurat(conversion_script, input_file):
-    '''Convert a h5ad file to a h5seurat file.
-    NOTE: the h5ad file must be cleaned to remove non-necessary
-    metadata, ortherwise the underlying R script may crash.
-    '''
-    conversion_cmd = ['Rscript', '--vanilla', conversion_script, input_file]
+def convert_anndata_to_h5seurat_file(adata, conversion_script, scratch_path, output_file):
+    '''Convert and anndata to a h5seurat file.'''
+    # Generate the intermediate files
+    mtx_file = os.path.join(scratch_path, 'counts.npz') 
+    cells_file = os.path.join(scratch_path, 'cells.csv') 
+    features_file = os.path.join(scratch_path, 'features.csv') 
+    metadata_file = os.path.join(scratch_path, 'metadata.csv') 
+
+    print('Write the matrix file.')
+    scipy.sparse.save_npz(mtx_file, scipy.sparse.csc_matrix(adata.X))
+    print('Write the cells file.')
+    adata.obs[[]].to_csv(cells_file, header=False)
+    print('Write the features file.')
+    adata.var[[]].to_csv(features_file, header=False)
+    print('Write the metadata file.')
+    adata.obs.to_csv(metadata_file, index=False)
+
+    # Run the conversion script
+    conversion_cmd = ['Rscript', '--vanilla', conversion_script, 
+            mtx_file, cells_file, features_file, metadata_file, output_file]
     print('Running command:')
     print(' '.join(conversion_cmd))
     subprocess.check_call(conversion_cmd)
+
+    # Remove the intermediate files
+    os.remove(mtx_file)
+    os.remove(cells_file)
+    os.remove(features_file)
+    os.remove(metadata_file)
 
 def all_cell_id_files_already_exist(N_subsets_to_write, subsets_path, data_file_prefix):
     all_exist = True
@@ -109,10 +150,9 @@ def generate_one_subset(i, adata, subsets_path, data_file_prefix, conversion_scr
     adata_ds = adata[adata.obs.index.isin(subset_cell_ids)]
     os.makedirs(os.path.join(subsets_path, str(i), 'integrated'), exist_ok=True)
     
-    output_file = os.path.join(subsets_path, str(i), f'{data_file_prefix}.gzip.h5ad')
-    adata_ds.write(output_file, compression='gzip')
-    convert_h5ad_to_h5seurat(conversion_script, output_file)
-    os.remove(output_file)
+    scratch_path = os.path.join(subsets_path, str(i))
+    output_file = os.path.join(subsets_path, str(i), f'{data_file_prefix}.gzip.h5seurat')
+    convert_anndata_to_h5seurat_file(adata_ds, conversion_script, scratch_path, output_file)
 
 def generate_subsets(adata, N_subsets, n_repeat, N_subsets_to_write, 
         cell_type_column, min_N_cells_per_cluster,
@@ -167,7 +207,7 @@ def prepare_integration_inputs_for_one_cell_type(output_path, reference_adata, q
     subsets_path = os.path.join(output_path, 'subsets')
     os.makedirs(subsets_path, exist_ok=True)
     conversion_script = os.path.join(output_path, 'convert_anndata_to_seurat.R') 
-    generate_h5ad_to_h5seurat_conversion_R_script(conversion_script)
+    generate_h5seurat_conversion_R_script(conversion_script)
 
     generate_subsets(reference_adata, N_subsets_reference, n_repeat_reference, N_subsets_to_write,
             reference_cell_type_column, min_N_cells_per_cluster, subsets_path, conversion_script, 'reference',
@@ -266,7 +306,7 @@ print(features)
 anchors_t <- FindTransferAnchors(reference = dR_query_genes, query = dQ, reduction='cca', features=features)
 
 # Predict the class labels and same the predictions as a csv file 
-predictions_class_label <- TransferData(anchorset = anchors_t, weight.reduction = 'cca', refdata=dR@meta.data[[cell_type_col]])
+predictions_class_label <- TransferData(anchorset = anchors_t, weight.reduction = 'cca', refdata=as.factor(dR@meta.data[[cell_type_col]]))
 write.csv(as.data.frame(predictions_class_label), paste(output_path, 'predicted_cell_types.csv', sep='/'))
 '''
     if len(continuous_columns_to_impute) > 0:
