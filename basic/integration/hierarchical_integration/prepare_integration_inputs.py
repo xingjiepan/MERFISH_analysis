@@ -247,7 +247,7 @@ def prepare_integration_inputs_for_one_round(output_path, reference_adata_file, 
                 n_repeat_query=n_repeat_query, min_N_cells_per_cluster=min_N_cells_per_cluster, n_threads=n_threads)
 
 def generate_seurat_integration_script(output_file, impute_gene_expression=True, plot_coembedding=True,
-                                       continuous_columns_to_impute=[]):
+                                       continuous_columns_to_impute=[], variable_genes_fraction=0.5):
     '''Generate an R script for integration using Seurat.'''
     script = '''# R script for integrating a query Seurat dataset to a reference Seurat dataset.
 # Usage:
@@ -292,8 +292,11 @@ d_list <- list(dR_query_genes, dQ)
 # Normalize and identify variable features for each dataset independently
 d_list <- lapply(X = d_list, FUN = function(x) {
   x <- NormalizeData(x)
-  x <- FindVariableFeatures(x, selection.method = "vst")
-})
+'''
+    script += f'''  x <- FindVariableFeatures(x, selection.method="vst", nfeatures=as.integer({variable_genes_fraction} * length(all_query_genes)))
+'''
+
+    script += '''})
 
 # Select features that are repeatedly variable across datasets for integration
 features <- SelectIntegrationFeatures(object.list = d_list)
