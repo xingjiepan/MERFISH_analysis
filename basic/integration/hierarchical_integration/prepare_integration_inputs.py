@@ -326,10 +326,6 @@ write.csv(as.data.frame(Transpose(predicted_cont_values@data)), paste(output_pat
 predictions_counts <- TransferData(anchorset = anchors_t, weight.reduction = 'cca', refdata=attr(attr(dR, 'assay')[[1]], 'counts'))
 imputed_Q <- CreateSeuratObject(counts = predictions_counts)
 
-# Predict the cell types in the query dataset
-imputed_Q <- AddMetaData(imputed_Q, predictions_class_label['predicted.id'], col.name = 'predicted.id')
-imputed_Q <- AddMetaData(imputed_Q, predictions_class_label['prediction.score.max'], col.name = 'prediction.score.max')
-
 # Save the imputed dataset
 SaveH5Seurat(imputed_Q, filename = paste(output_path, 'imputation.h5Seurat', sep='/'), overwrite = TRUE)
 Convert(paste(output_path, 'imputation.h5Seurat', sep='/'), dest = "h5ad", overwrite = TRUE)

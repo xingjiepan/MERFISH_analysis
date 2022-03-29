@@ -117,7 +117,8 @@ def initialize_integration_project(options):
     '''Initialize an integration project.'''
     # Parse the reference columns
     reference_columns_by_rounds = options.reference_columns_by_rounds.split(',')
-    
+    rounds_to_impute_gene_exp = options.rounds_to_impute_gene_exp.split(',')
+
     if not (options.continuous_columns_to_impute is None):
         continuous_columns_to_impute = options.continuous_columns_to_impute.split(',')
     else: 
@@ -148,8 +149,6 @@ def initialize_integration_project(options):
     # Generate scripts for integration
     for i, col in enumerate(reference_columns_by_rounds):
 
-        impute_gene_expression = False # TODO: implement gene expression imputation
-
         # The first round has some different parameters
         if i == 0:
             query_adata_file_current = cleaned_query_adata_file
@@ -166,6 +165,8 @@ def initialize_integration_project(options):
             harvard_rc = True
         else:
             harvard_rc = False
+
+        impute_gene_expression = col in rounds_to_impute_gene_exp
 
         generate_script_for_prepare_inputs(options.script_home, options.project_path, i, 
             cleaned_reference_adata_file, query_adata_file_current, 
@@ -200,6 +201,8 @@ if __name__ == '__main__':
             help='A comma separated list of column names for each round of integration.')
     parser.add_option('--continuous_columns_to_impute', dest='continuous_columns_to_impute', action='store', type='string',
             help='A comma separated list of column names for continuous variables to be imputed')
+    parser.add_option('--rounds_to_impute_gene_exp', dest='rounds_to_impute_gene_exp', action='store', type='string', default='',
+            help='A comma separated list of column names for gene expression imputation.')
     parser.add_option('-a', '--approximate_subset_size', dest='approximate_subset_size', action='store', type='int', default=10000,
             help='The approximate size of each subset for integration.')
     parser.add_option('-e', '--n_repeat_query', dest='n_repeat_query', action='store', type='int', default=3,
