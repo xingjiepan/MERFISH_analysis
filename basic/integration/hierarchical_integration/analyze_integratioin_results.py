@@ -161,6 +161,68 @@ def get_predicted_continuous_variables(integration_path):
     
     return calculate_predicted_continuous_variables(pv_dict, column_names)
 
+def combine_imputed_gene_expressions(integration_path):
+    '''Combine the imputed gene expressions for each cluster for integration.'''
+
+    for cluster_path in os.listdir(integration_path):
+        subsets_path = os.path.join(integration_path, cluster_path, 'subsets')
+       
+        cell_position_dict = {}
+        adata_Xs = []
+        adata_id = 0
+
+        # Load the adatas and the position of each cell
+        if os.path.exists(subsets_path):
+            imputation_files = []
+            
+            for ff in os.listdir(subsets_path):
+                imputation_file = os.path.join(subsets_path, ff, 'integrated', 'imputation.h5ad')
+                if os.path.exists(imputation_file):
+                    imputation_files.append(imputation_file)
+
+            if len(imputation_files) > 0:
+                print(f'Combine the imputed gene expressions in {subsets_path}')
+                for imputation_file in imputation_files:
+
+                    adata = anndata.read_h5ad(imputation_file)
+                    gene_ids = list(adata.var.index)
+
+                    # Record the expression data as numpy arrays
+                    if type(adata.X) is np.ndarray:
+                        adata_Xs.append(adata.X)
+                    else:
+                        adata_Xs.append(adata.X.toarray())
+                   
+                    # Save the positions of the cell
+                    for i in range(len(adata.obs.index)):
+                        cell_id = adata.obs.index[i]
+
+                        if not (cell_id in cell_position_dict):
+                            cell_position_dict[cell_id] = []
+                        
+                        cell_position_dict[cell_id].append((adata_id, i))
+
+                    adata_id += 1
+
+                # Aggregate the expressions into a matrix
+                mean_expressions = []
+                cell_ids = []
+
+                for cell_id in cell_position_dict:
+                    cell_ids.append(cell_id)
+
+                    cell_expressions = []
+                    for i_a, i_c in cell_position_dict[cell_id]:
+                        cell_expressions.append(adata_Xs[i_a][i_c]) 
+
+                    mean_expressions.append(np.mean(cell_expressions, axis=0))
+                
+                adata_mean = anndata.AnnData(np.array(mean_expressions), 
+                                             pd.DataFrame(index=cell_ids), 
+                                             pd.DataFrame(index=gene_ids))
+                
+                output_file = os.path.join(integration_path, cluster_path, 'imputed_gene_expressions.h5ad')
+                adata_mean.write(output_file)
 
 def analyze_integration_result(integration_path, adata_file_before_integration, 
         prediction_cell_type_col, mixing_threshold=100):
@@ -199,6 +261,7 @@ def analyze_integration_result(integration_path, adata_file_before_integration,
     adata.write(output_file)
 
 
+
 if __name__ == '__main__':
     parser = OptionParser()
     parser.add_option('-t', '--mixing_threshold', dest='mixing_threshold', action='store', 
@@ -210,6 +273,8 @@ if __name__ == '__main__':
     adata_file_before_integration = args[1]
     prediction_cell_type_col = args[2]
     mixing_threshold = options.mixing_threshold
-
+    
     analyze_integration_result(integration_path, adata_file_before_integration, prediction_cell_type_col,
-                               mixing_threshold)
+                              mixing_threshold)
+
+    combine_imputed_gene_expressions(integration_path)
