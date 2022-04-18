@@ -287,22 +287,33 @@ dQ <- AddMetaData(dQ, factor(c('query')), col.name = 'source')
 ## DEFINE THE GENES FOR INTEGRATION
 # Only keep the genes in the query dataset for normalization
 all_query_genes <- rownames(dQ)
-dR_query_genes <- subset(dR, features = all_query_genes)
+de_gene_file = paste(output_path, 'preselected_de_genes.csv', sep='/') 
 
-d_list <- list(dR_query_genes, dQ)
+if (file.exists(de_gene_file)){ # Use preselected DE genes
+    print('Load preselected differentially expressed genes.')
+    de_df = read.csv(de_gene_file)
+    features = intersect(de_df$de_genes, all_query_genes)
+     
+}else{ # Find DE genes.
+    print('Look for differentially expressed genes.')
+    dR_query_genes <- subset(dR, features = all_query_genes)
 
-# Normalize and identify variable features for each dataset independently
-d_list <- lapply(X = d_list, FUN = function(x) {
-  x <- NormalizeData(x)
+    d_list <- list(dR_query_genes, dQ)
+
+    # Normalize and identify variable features for each dataset independently
+    d_list <- lapply(X = d_list, FUN = function(x) {
+        x <- NormalizeData(x)
 '''
-    script += f'''  x <- FindVariableFeatures(x, selection.method="vst", nfeatures=as.integer({variable_genes_fraction} * length(all_query_genes)))
+    script += f'''        x <- FindVariableFeatures(x, selection.method="vst", nfeatures=as.integer({variable_genes_fraction} * length(all_query_genes)))
 '''
 
-    script += '''})
+    script += '''   })
 
-# Select features that are repeatedly variable across datasets for integration
-features <- SelectIntegrationFeatures(object.list = d_list)
-features = features[features != drop_gene]
+    # Select features that are repeatedly variable across datasets for integration
+    features <- SelectIntegrationFeatures(object.list = d_list)
+    features = features[features != drop_gene]
+}
+
 print('Integration using the following genes:')
 print(features)
 
