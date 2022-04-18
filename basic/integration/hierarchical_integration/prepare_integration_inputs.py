@@ -283,6 +283,8 @@ dR <- AddMetaData(dR, factor(c('reference')), col.name = 'source')
 dQ <- LoadH5Seurat(query_file)
 dQ <- AddMetaData(dQ, factor(c('query')), col.name = 'source')
 
+
+## DEFINE THE GENES FOR INTEGRATION
 # Only keep the genes in the query dataset for normalization
 all_query_genes <- rownames(dQ)
 dR_query_genes <- subset(dR, features = all_query_genes)
@@ -304,9 +306,27 @@ features = features[features != drop_gene]
 print('Integration using the following genes:')
 print(features)
 
+# Create Seurat objects for integration 
+dR_de_genes = subset(dR, features = features)
+dQ_de_genes = subset(dQ, features = features)
+d_list <- list(dR_de_genes, dQ_de_genes)
+d_list <- lapply(X = d_list, FUN = function(x) {
+  x <- NormalizeData(x)
+})
+
+## MAKE THE CO-EMBEDDING PLOT BEFORE INTEGRATION
+d_merged <- merge(dR_de_genes, y = dQ_de_genes, add.cell.ids = c("reference", "query"))
+d_merged <- ScaleData(d_merged)
+d_merged <- RunPCA(d_merged, features=features)
+d_merged <- RunUMAP(d_merged, dims = 1:min(length(d_merged@reductions[["pca"]]), 50))
+
+png(filename=paste(output_path, 'coembed_before_integration.png', sep='/'), width=1024, height=1024)
+DimPlot(d_merged, reduction = "umap", group.by = "source")
+dev.off()
+
 ## IMPUTATION AND LABEL TRANSFER
 # Find the anchors for imputation and label transfer
-anchors_t <- FindTransferAnchors(reference = dR_query_genes, query = dQ, reduction='cca', features=features)
+anchors_t <- FindTransferAnchors(reference = dR_de_genes, query = dQ_de_genes, reduction='cca', features=features, dims=1:min(length(features) - 1, 30))
 
 # Predict the class labels and same the predictions as a csv file 
 predictions_class_label <- TransferData(anchorset = anchors_t, weight.reduction = 'cca', refdata=as.factor(dR@meta.data[[cell_type_col]]))
@@ -336,17 +356,19 @@ file.remove(paste(output_path, 'imputation.h5Seurat', sep='/'))
 ## CO-EMBED THE DATASETS AND MAKE UMAP PLOTS
 # Integrate the datasets
 v_ref <- c(1)
-anchors <- FindIntegrationAnchors(object.list = d_list, anchor.features = features, reference=v_ref)
-d_integrated <- IntegrateData(anchorset = anchors)
+anchors <- FindIntegrationAnchors(object.list = d_list, anchor.features = features, reference=v_ref,
+                                 dims=1:min(length(features) - 1, 30))
+d_integrated <- IntegrateData(anchorset = anchors, dims=1:min(length(features) - 1, 30))
 DefaultAssay(d_integrated) <- "integrated"
 
 # Co-embedding
 d_integrated <- ScaleData(d_integrated)
 d_integrated <- RunPCA(d_integrated)
-d_integrated <- RunUMAP(d_integrated, dims = 1:50)
+d_integrated <- RunUMAP(d_integrated, dims = 1:min(length(d_integrated@reductions[["pca"]]), 50))
 
 # Calculate and save the mixing score for the integration
-d_integrated <- AddMetaData(d_integrated, MixingMetric(d_integrated, 'source', reduction='pca', dims=1:20), 'mixing_score')
+d_integrated <- AddMetaData(d_integrated, MixingMetric(d_integrated, 'source', reduction='pca', 
+                            dims=1:min(length(d_integrated@reductions[["pca"]]), 20)), 'mixing_score')
 
 # Make splitted copies of the integrated data
 splitted_d_integrated <- SplitObject(d_integrated, split.by='source')
