@@ -12,7 +12,7 @@ def generate_global_permutation(N_cells):
     '''Permutate the cells.
     Return a list of permutated cell IDs.
     '''
-    permutated_cell_ids = list(range(len(neighbors)))
+    permutated_cell_ids = list(range(N_cells))
     np.random.shuffle(permutated_cell_ids)
     return permutated_cell_ids
 
@@ -79,7 +79,7 @@ def generate_cell_type_contact_count_matrices(df, cell_type_col, coord_cols, cel
         contact_radius: The radius within with two cells are regarded as close contacts.
         local_permute_radius: The radius for local permutation.
     '''
-    assert(permutation_method in ['no_permutation', 'local_permutation', 'global_permutaion'])
+    assert(permutation_method in ['no_permutation', 'local_permutation', 'global_permutation'])
 
     # Find the contacting neighbors of each cell
     points = np.array(df[coord_cols])
@@ -96,7 +96,7 @@ def generate_cell_type_contact_count_matrices(df, cell_type_col, coord_cols, cel
     if permutation_method == 'no_permutation':
         return count_cell_type_contacts(neighbors_contact, cell_type_ids_of_cells, N_cell_types)
         
-    elif permutation_method == 'global_permutaion':
+    elif permutation_method == 'global_permutation':
         permuted_contact_tensor = np.zeros((N_permutations, N_cell_types, N_cell_types))
         
         for i in range(N_permutations):
