@@ -1,8 +1,7 @@
 import numpy as np
+import pandas as pd
 import scipy.spatial as spatial
 from scipy.sparse import csr_matrix
-import scipy.stats
-import statsmodels
 
 
 def find_neighbors_of_points(points, radius):
@@ -35,7 +34,7 @@ def generate_local_permutation(neighbors):
     
     return permutated_cell_ids
 
-def count_cell_type_contacts(neighbors, cell_type_ids_of_cells, permutated_cell_ids=None,
+def count_cell_type_contacts(neighbors, cell_type_ids_of_cells, N_cell_types, permutated_cell_ids=None,
                              use_sparse_matrix=False):
     '''Count the contacts between cell types.
     Return a sparse matrix of the number of contacts between
@@ -46,7 +45,6 @@ def count_cell_type_contacts(neighbors, cell_type_ids_of_cells, permutated_cell_
         permutated_cell_ids = list(range(len(neighbors)))
     
     # Initialize the counting matrix
-    N_cell_types = np.max(cell_type_ids_of_cells) + 1
     if use_sparse_matrix:
         ct_contact_count_mtx = csr_matrix((N_cell_types, N_cell_types), dtype=int)
     else:
@@ -66,14 +64,14 @@ def count_cell_type_contacts(neighbors, cell_type_ids_of_cells, permutated_cell_
             
     return ct_contact_count_mtx
 
-def generate_cell_type_contact_matrices(adata, cell_type_col, coord_cols, cell_types, 
+def generate_cell_type_contact_count_matrices(df, cell_type_col, coord_cols, cell_types, 
                                         permutation_method, N_permutations=1, contact_radius=15,
                                         local_permute_radius=50):
     '''Generate a cell type contact matrix.
     Args:
-        adata: The anndata object of one slice of tissue.
-        cell_type_col: The column in adata.obs that defines cell types.
-        coord_cols: A list of columns in adata.obs that define the spatial coordinates.
+        df: The pandas DataFrame of one slice of tissue.
+        cell_type_col: The column in df that defines cell types.
+        coord_cols: A list of columns in df that define the spatial coordinates.
         cell_types: A list of cell types.
         permutation_method: The method for permutation allowed values are 
             ['no_permutation', 'local_permutation', 'global_permutaion'].
@@ -84,7 +82,7 @@ def generate_cell_type_contact_matrices(adata, cell_type_col, coord_cols, cell_t
     assert(permutation_method in ['no_permutation', 'local_permutation', 'global_permutaion'])
 
     # Find the contacting neighbors of each cell
-    points = np.array(adata.obs[coord_cols])
+    points = np.array(df[coord_cols])
     point_tree = spatial.cKDTree(points)
     neighbors_contact = point_tree.query_ball_point(points, contact_radius)
 
@@ -92,11 +90,11 @@ def generate_cell_type_contact_matrices(adata, cell_type_col, coord_cols, cell_t
     N_cell_types = len(cell_types)
     cell_type_ids = list(range(N_cell_types))
     cell_type_id_map = pd.DataFrame({'cell_type_id':cell_type_ids, 'cell_type':cell_types})
-    cell_type_ids_of_cells = list(adata.obs[[cell_type_col]].merge(cell_type_id_map, 
+    cell_type_ids_of_cells = list(df[[cell_type_col]].merge(cell_type_id_map, 
             left_on=cell_type_col, right_on='cell_type', how='left')['cell_type_id'])
 
     if permutation_method == 'no_permutation':
-        return count_cell_type_contacts(neighbors_contact, cell_type_ids_of_cells)
+        return count_cell_type_contacts(neighbors_contact, cell_type_ids_of_cells, N_cell_types)
         
     elif permutation_method == 'global_permutaion':
         permuted_contact_tensor = np.zeros((N_permutations, N_cell_types, N_cell_types))
@@ -104,19 +102,19 @@ def generate_cell_type_contact_matrices(adata, cell_type_col, coord_cols, cell_t
         for i in range(N_permutations):
             permutated_cell_ids = generate_global_permutation(len(cell_type_ids_of_cells))
             permuted_ct_contact_count_mtx = count_cell_type_contacts(neighbors_contact, cell_type_ids_of_cells,
-                                                            permutated_cell_ids=permutated_cell_ids)
+                                                            N_cell_types, permutated_cell_ids=permutated_cell_ids)
             permuted_contact_tensor[i] = permuted_ct_contact_count_mtx
 
         return permuted_contact_tensor
 
     elif permutation_method == 'local_permutation':
-        neighbors_permute = point_tree.query_ball_point(points, permute_radius)
+        neighbors_permute = point_tree.query_ball_point(points, local_permute_radius)
         permuted_contact_tensor = np.zeros((N_permutations, N_cell_types, N_cell_types))
        
         for i in range(N_permutations):
             permutated_cell_ids = generate_local_permutation(neighbors_permute)
             permuted_ct_contact_count_mtx = count_cell_type_contacts(neighbors_contact, cell_type_ids_of_cells,
-                                                            permutated_cell_ids=permutated_cell_ids)
+                                                            N_cell_types, permutated_cell_ids=permutated_cell_ids)
             permuted_contact_tensor[i] = permuted_ct_contact_count_mtx
 
         return permuted_contact_tensor
