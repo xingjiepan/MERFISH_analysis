@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 
 def load_barcode_files_under_dir(barcode_dump_path):
     '''Load barcode files under a given directory.'''
-    barcode_files = [os.path.join(barcode_dump_path, f) for f in os.listdir(barcode_dump_path)
-                                                         if f.endswith('.h5')]
+    barcode_files = sorted([os.path.join(barcode_dump_path, f) for f in os.listdir(barcode_dump_path)
+                                                         if f.endswith('.h5')])
     df_list = [] 
     for bf in barcode_files:
         print(f'Load barcodes in {bf}')
